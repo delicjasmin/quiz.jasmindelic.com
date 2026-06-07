@@ -1,4 +1,5 @@
 import { useColorScheme } from "@mui/material";
+import Image from "next/image";
 import { ChangeEvent } from "react";
 import { ThemeSwitch } from "../theme";
 
@@ -16,6 +17,8 @@ export function Header() {
     <header className="h-12 w-full border-b px-4 py-1.5">
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="flex items-center gap-2">
+          <Image src="/logo.png" alt="Quiz Generator" width={32} height={32} />
+
           <h1 className="text-lg font-semibold text-nowrap sm:text-xl">
             Quiz Generator
           </h1>
