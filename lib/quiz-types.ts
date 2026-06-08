@@ -23,6 +23,23 @@ export const persistedQuizSettingsSchema = z.object({
 
 export type PersistedQuizSettings = z.infer<typeof persistedQuizSettingsSchema>;
 
+/** Settings that can be changed after a quiz is created (no re-generation). */
+export const editableQuizSettingsSchema = persistedQuizSettingsSchema.pick({
+  timerEnabled: true,
+  timerMinutes: true,
+  answerReveal: true,
+  shuffleQuestions: true,
+  shuffleAnswers: true,
+});
+
+export type EditableQuizSettings = z.infer<typeof editableQuizSettingsSchema>;
+
+export function pickEditableQuizSettings(
+  settings: PersistedQuizSettings,
+): EditableQuizSettings {
+  return editableQuizSettingsSchema.parse(settings);
+}
+
 export const generatedQuestionSchema = z.object({
   type: z.enum(["multiple-choice", "true-false"]),
   question: z.string().min(1),
