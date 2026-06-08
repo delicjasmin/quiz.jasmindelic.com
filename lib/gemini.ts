@@ -8,6 +8,7 @@ import {
   type GeneratedQuestion,
   type PersistedQuizSettings,
 } from "@/lib/quiz-types";
+import { formatGeminiError } from "@/lib/user-facing-errors";
 
 const questionResponseSchema: ResponseSchema = {
   type: SchemaType.OBJECT,
@@ -122,41 +123,17 @@ function getModelCandidates(): string[] {
     return [configured];
   }
 
-  return ["gemini-2.5-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash"];
+  return [
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash",
+  ];
 }
 
 function isQuotaError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("429") || message.includes("quota");
-}
-
-function formatGeminiError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-
-  if (message.includes("limit: 0")) {
-    return (
-      "This Gemini model has no free-tier quota on your API key. " +
-      "Try setting GEMINI_MODEL=gemini-2.5-flash in .env, or create a new key at " +
-      "https://aistudio.google.com/apikey. If the issue persists, enable billing in " +
-      "Google AI Studio (Settings → Billing) — some accounts need this even for free tier."
-    );
-  }
-
-  if (message.includes("429") || message.includes("quota")) {
-    return (
-      "Gemini API rate limit reached. Wait a minute and try again, or check your quota at " +
-      "https://aistudio.google.com/app/apikey."
-    );
-  }
-
-  if (message.includes("API_KEY_INVALID") || message.includes("API key not valid")) {
-    return (
-      "Invalid GEMINI_API_KEY. Create a key at https://aistudio.google.com/apikey " +
-      "(keys usually start with AIza)."
-    );
-  }
-
-  return message;
 }
 
 async function generateWithModel(
@@ -203,8 +180,9 @@ export async function generateQuizQuestions(
       const responseText = await generateWithModel(modelName, prompt, apiKey);
       return parseGeneratedQuestions(responseText, settings.questionCount);
     } catch (error) {
+      console.error(`[gemini] ${modelName} failed:`, error);
       const formatted = formatGeminiError(error);
-      errors.push(`${modelName}: ${formatted}`);
+      errors.push(formatted);
 
       if (!isQuotaError(error) || models.length === 1) {
         throw new Error(formatted);
@@ -212,7 +190,10 @@ export async function generateQuizQuestions(
     }
   }
 
-  throw new Error(errors.join(" "));
+  throw new Error(
+    errors[0] ??
+      "The AI service is temporarily unavailable. Please try again later.",
+  );
 }
 
 function parseGeneratedQuestions(
@@ -229,7 +210,9 @@ function parseGeneratedQuestions(
   const validated = generatedQuestionsSchema.safeParse(parsed);
 
   if (!validated.success) {
-    throw new Error("Gemini response did not match the expected question format.");
+    throw new Error(
+      "Gemini response did not match the expected question format.",
+    );
   }
 
   if (validated.data.questions.length !== expectedCount) {

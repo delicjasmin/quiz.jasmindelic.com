@@ -4,6 +4,7 @@ import {
   editableQuizSettingsSchema,
   persistedQuizSettingsSchema,
 } from "@/lib/quiz-types";
+import { toUserFacingError } from "@/lib/user-facing-errors";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
@@ -125,10 +126,10 @@ export const quizRouter = router({
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to generate quiz questions.",
+          message: toUserFacingError(
+            error,
+            "Could not generate quiz questions. Please try again.",
+          ),
         });
       }
 

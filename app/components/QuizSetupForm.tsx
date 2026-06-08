@@ -2,7 +2,8 @@
 
 import { useSession } from "@/lib/auth-client";
 import { trpc } from "@/lib/trpc";
-import { Description, FileUpload, InfoRounded } from "@mui/icons-material";
+import { toUserFacingError } from "@/lib/user-facing-errors";
+import { Description, ErrorOutlined, FileUpload, InfoRounded } from "@mui/icons-material";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -25,7 +26,7 @@ import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Loading } from "./Loading";
+import { QuizGenerationProgress } from "./QuizGenerationProgress";
 
 type Difficulty = "easy" | "medium" | "hard";
 type QuestionType = "multiple-choice" | "true-false" | "mixed";
@@ -88,6 +89,7 @@ export default function QuizSetupForm() {
   const { data: session, isPending: isSessionPending } = useSession();
 
   const [error, setError] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
@@ -203,6 +205,7 @@ export default function QuizSetupForm() {
     }
 
     setError(null);
+    setGenerationError(null);
 
     try {
       const result = await generateQuiz.mutateAsync({
@@ -224,8 +227,11 @@ export default function QuizSetupForm() {
 
       router.push(`/quiz/${result.quizId}`);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to generate the quiz.",
+      setGenerationError(
+        toUserFacingError(
+          err,
+          "Could not generate your quiz. Please try again.",
+        ),
       );
     }
   };
@@ -238,17 +244,40 @@ export default function QuizSetupForm() {
 
   if (isGenerating) {
     return (
-      <Box className="flex min-h-[80vh] flex-col items-center justify-center gap-4">
-        <Loading size={120} />
-        <Typography variant="h6">Generating your quiz...</Typography>
+      <QuizGenerationProgress
+        pageStart={settings.pageStart}
+        pageEnd={settings.pageEnd}
+        questionCount={settings.questionCount}
+      />
+    );
+  }
+
+  if (generationError) {
+    return (
+      <Box className="flex min-h-[80vh] flex-col items-center justify-center gap-3 px-4">
+        <ErrorOutlined color="error" sx={{ fontSize: 64 }} />
+        <Typography variant="h6">Couldn&apos;t generate your quiz</Typography>
         <Typography
           variant="body2"
           color="text.secondary"
-          sx={{ textAlign: "center" }}
+          sx={{ textAlign: "center", maxWidth: 420 }}
         >
-          Extracting text from pages {settings.pageStart}-{settings.pageEnd} and
-          asking Gemini to create {settings.questionCount} questions.
+          {generationError}
         </Typography>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 2 }}>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setGenerationError(null);
+              void handleStartQuiz();
+            }}
+          >
+            Try again
+          </Button>
+          <Button variant="outlined" onClick={() => setGenerationError(null)}>
+            Back to settings
+          </Button>
+        </Stack>
       </Box>
     );
   }
