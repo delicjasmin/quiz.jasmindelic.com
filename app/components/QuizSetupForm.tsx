@@ -1,7 +1,12 @@
 "use client";
 
+import { useSession } from "@/lib/auth-client";
+import { trpc } from "@/lib/trpc";
+import { Description, FileUpload, InfoRounded } from "@mui/icons-material";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
@@ -17,15 +22,16 @@ import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
 import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { Description, FileUpload, InfoRounded } from "@mui/icons-material";
+import { Loading } from "./Loading";
 
 type Difficulty = "easy" | "medium" | "hard";
 type QuestionType = "multiple-choice" | "true-false" | "mixed";
 type AnswerReveal = "immediate" | "end" | "never";
 
-export type QuizSettings = {
-  pdfFile: File | null;
+type QuizFormSettings = {
   questionCount: number;
   timerEnabled: boolean;
   timerMinutes: number;
@@ -34,9 +40,11 @@ export type QuizSettings = {
   answerReveal: AnswerReveal;
   shuffleQuestions: boolean;
   shuffleAnswers: boolean;
+  pageStart: number;
+  pageEnd: number;
 };
 
-const defaultSettings: Omit<QuizSettings, "pdfFile"> = {
+const defaultSettings: QuizFormSettings = {
   questionCount: 10,
   timerEnabled: false,
   timerMinutes: 15,
@@ -45,24 +53,95 @@ const defaultSettings: Omit<QuizSettings, "pdfFile"> = {
   answerReveal: "end",
   shuffleQuestions: true,
   shuffleAnswers: true,
+  pageStart: 1,
+  pageEnd: 1,
 };
 
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+
+      if (typeof result !== "string") {
+        reject(new Error("Failed to read the PDF file."));
+        return;
+      }
+
+      const base64 = result.split(",")[1];
+
+      if (!base64) {
+        reject(new Error("Failed to encode the PDF file."));
+        return;
+      }
+
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error("Failed to read the PDF file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function QuizSetupForm() {
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: session, isPending: isSessionPending } = useSession();
+
   const [error, setError] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [pageCount, setPageCount] = useState<number | null>(null);
+  const [isReadingPdf, setIsReadingPdf] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [settings, setSettings] = useState(defaultSettings);
 
-  const updateSetting = <K extends keyof typeof defaultSettings>(
+  const getPdfInfo = trpc.quiz.getPdfInfo.useMutation();
+  const generateQuiz = trpc.quiz.generate.useMutation();
+
+  const updateSetting = <K extends keyof QuizFormSettings>(
     key: K,
-    value: (typeof defaultSettings)[K],
+    value: QuizFormSettings[K],
   ) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
   const MAX_SIZE_MB = 10;
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+  const isGenerating = generateQuiz.isPending;
+  const isBusy = isReadingPdf || isGenerating;
+
+  const loadPdfMetadata = async (file: File) => {
+    setIsReadingPdf(true);
+    setError(null);
+
+    try {
+      const base64 = await readFileAsBase64(file);
+      const info = await getPdfInfo.mutateAsync({ pdfBase64: base64 });
+
+      setPdfFile(file);
+      setPdfBase64(base64);
+      setPageCount(info.pageCount);
+      setSettings((prev) => ({
+        ...prev,
+        pageStart: 1,
+        pageEnd: info.pageCount,
+      }));
+    } catch (err) {
+      setPdfFile(null);
+      setPdfBase64(null);
+      setPageCount(null);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      setError(
+        err instanceof Error ? err.message : "Failed to read the PDF file.",
+      );
+    } finally {
+      setIsReadingPdf(false);
+    }
+  };
 
   const handleFile = (file: File | null) => {
     if (!file) return;
@@ -70,6 +149,8 @@ export default function QuizSetupForm() {
     if (file.type !== "application/pdf") {
       setError("Please upload a PDF file.");
       setPdfFile(null);
+      setPdfBase64(null);
+      setPageCount(null);
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -81,6 +162,8 @@ export default function QuizSetupForm() {
     if (file.size > MAX_SIZE_BYTES) {
       setError(`The file size exceeds the ${MAX_SIZE_MB}MB limit.`);
       setPdfFile(null);
+      setPdfBase64(null);
+      setPageCount(null);
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -89,8 +172,7 @@ export default function QuizSetupForm() {
       return;
     }
 
-    setError(null);
-    setPdfFile(file);
+    void loadPdfMetadata(file);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -99,10 +181,53 @@ export default function QuizSetupForm() {
     handleFile(e.dataTransfer.files[0] ?? null);
   };
 
-  const handleStartQuiz = () => {
-    const quizConfig: QuizSettings = { pdfFile, ...settings };
-    console.log("Quiz config:", quizConfig);
-    // TODO: navigate to quiz session with config
+  const handleStartQuiz = async () => {
+    if (!pdfFile || !pdfBase64 || !pageCount) {
+      setError("Upload a PDF before starting the quiz.");
+      return;
+    }
+
+    if (!session) {
+      setError("You must be logged in to generate a quiz.");
+      return;
+    }
+
+    if (settings.pageStart < 1 || settings.pageEnd > pageCount) {
+      setError(`Page range must be between 1 and ${pageCount}.`);
+      return;
+    }
+
+    if (settings.pageStart > settings.pageEnd) {
+      setError("Start page must be less than or equal to end page.");
+      return;
+    }
+
+    setError(null);
+
+    try {
+      const result = await generateQuiz.mutateAsync({
+        pdfBase64,
+        fileName: pdfFile.name,
+        settings: {
+          questionCount: settings.questionCount,
+          timerEnabled: settings.timerEnabled,
+          timerMinutes: settings.timerMinutes,
+          difficulty: settings.difficulty,
+          questionType: settings.questionType,
+          answerReveal: settings.answerReveal,
+          shuffleQuestions: settings.shuffleQuestions,
+          shuffleAnswers: settings.shuffleAnswers,
+          pageStart: settings.pageStart,
+          pageEnd: settings.pageEnd,
+        },
+      });
+
+      router.push(`/quiz/${result.quizId}`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to generate the quiz.",
+      );
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -111,9 +236,38 @@ export default function QuizSetupForm() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  if (isGenerating) {
+    return (
+      <Box className="flex min-h-[80vh] flex-col items-center justify-center gap-4">
+        <Loading size={120} />
+        <Typography variant="h6">Generating your quiz...</Typography>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ textAlign: "center" }}
+        >
+          Extracting text from pages {settings.pageStart}-{settings.pageEnd} and
+          asking Gemini to create {settings.questionCount} questions.
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
     <Box className="min-h-[90vh]">
       <Container maxWidth="lg" className="py-4 sm:py-5">
+        {!isSessionPending && !session && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            <Link href="/login">Log in</Link> to generate and save quizzes.
+          </Alert>
+        )}
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, lg: 6 }}>
             <Paper
@@ -165,10 +319,18 @@ export default function QuizSetupForm() {
                   type="file"
                   accept=".pdf,application/pdf"
                   hidden
+                  disabled={isBusy}
                   onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
                 />
 
-                {pdfFile ? (
+                {isReadingPdf ? (
+                  <>
+                    <CircularProgress size={36} sx={{ mb: 2 }} />
+                    <Typography sx={{ fontWeight: 600, textAlign: "center" }}>
+                      Reading PDF...
+                    </Typography>
+                  </>
+                ) : pdfFile ? (
                   <>
                     <Box
                       className="mb-2 flex h-14 w-14 items-center justify-center rounded-full"
@@ -188,6 +350,7 @@ export default function QuizSetupForm() {
                       sx={{ mt: 0.5 }}
                     >
                       {formatFileSize(pdfFile.size)}
+                      {pageCount ? ` · ${pageCount} pages` : ""}
                     </Typography>
                     <Button
                       size="small"
@@ -196,6 +359,8 @@ export default function QuizSetupForm() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setPdfFile(null);
+                        setPdfBase64(null);
+                        setPageCount(null);
                         setError(null);
 
                         if (fileInputRef.current)
@@ -228,16 +393,6 @@ export default function QuizSetupForm() {
                     </Typography>
                   </>
                 )}
-
-                {error && (
-                  <Typography
-                    color="error"
-                    variant="body2"
-                    className="mt-2 text-center"
-                  >
-                    {error}
-                  </Typography>
-                )}
               </Box>
             </Paper>
           </Grid>
@@ -255,6 +410,57 @@ export default function QuizSetupForm() {
               </Typography>
 
               <Stack spacing={3}>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
+                    Page range
+                  </Typography>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Start page"
+                      size="small"
+                      disabled={!pageCount || isBusy}
+                      slotProps={{
+                        htmlInput: { min: 1, max: pageCount ?? 1 },
+                      }}
+                      value={settings.pageStart}
+                      onChange={(e) =>
+                        updateSetting(
+                          "pageStart",
+                          Math.max(1, Number(e.target.value) || 1),
+                        )
+                      }
+                    />
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="End page"
+                      size="small"
+                      disabled={!pageCount || isBusy}
+                      slotProps={{
+                        htmlInput: { min: 1, max: pageCount ?? 1 },
+                      }}
+                      value={settings.pageEnd}
+                      onChange={(e) =>
+                        updateSetting(
+                          "pageEnd",
+                          Math.max(1, Number(e.target.value) || 1),
+                        )
+                      }
+                    />
+                  </Stack>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ mt: 1, display: "block" }}
+                  >
+                    {pageCount
+                      ? `Select pages 1-${pageCount} to use as source material.`
+                      : "Upload a PDF to choose which pages to use."}
+                  </Typography>
+                </Paper>
+
                 <Box>
                   <Stack
                     direction="row"
@@ -417,15 +623,21 @@ export default function QuizSetupForm() {
           <Button
             variant="contained"
             size="large"
-            disabled={!pdfFile}
-            onClick={handleStartQuiz}
+            disabled={!pdfFile || !session || isBusy}
+            onClick={() => void handleStartQuiz()}
             className="flex w-full flex-col gap-0.5 lg:w-80"
           >
-            Start Quiz
+            Generate Quiz
             {!pdfFile && (
               <Typography variant="caption" color="textDisabled">
                 <InfoRounded fontSize="small" className="mr-1" />
                 Upload a PDF to enable the quiz.
+              </Typography>
+            )}
+            {pdfFile && !session && (
+              <Typography variant="caption" color="textDisabled">
+                <InfoRounded fontSize="small" className="mr-1" />
+                Log in to generate and save your quiz.
               </Typography>
             )}
           </Button>

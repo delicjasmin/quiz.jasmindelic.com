@@ -21,15 +21,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
 
   return {
     prisma,
-    session: session
-      ? {
-          ...session,
-          user: {
-            ...session.user,
-            id: Number(session.user.id),
-          },
-        }
-      : null,
+    session,
     ...opts,
   };
 };
