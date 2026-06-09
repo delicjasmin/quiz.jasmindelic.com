@@ -19,9 +19,14 @@ export const persistedQuizSettingsSchema = z.object({
   shuffleAnswers: z.boolean(),
   pageStart: z.number().int().min(1),
   pageEnd: z.number().int().min(1),
+  pageRange: z.string().min(1).optional(),
 });
 
 export type PersistedQuizSettings = z.infer<typeof persistedQuizSettingsSchema>;
+
+export function formatQuizPageRange(settings: PersistedQuizSettings): string {
+  return settings.pageRange ?? `${settings.pageStart}-${settings.pageEnd}`;
+}
 
 /** Settings that can be changed after a quiz is created (no re-generation). */
 export const editableQuizSettingsSchema = persistedQuizSettingsSchema.pick({

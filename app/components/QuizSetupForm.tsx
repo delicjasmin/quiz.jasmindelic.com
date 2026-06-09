@@ -1,11 +1,18 @@
 "use client";
 
 import { useSession } from "@/lib/auth-client";
+import { parsePageRangeSpec } from "@/lib/page-range";
 import { trpc } from "@/lib/trpc";
 import { toUserFacingError } from "@/lib/user-facing-errors";
-import { Description, ErrorOutlined, FileUpload, InfoRounded } from "@mui/icons-material";
+import {
+  Description,
+  ErrorOutlined,
+  FileUpload,
+  InfoRounded,
+} from "@mui/icons-material";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Collapse from "@mui/material/Collapse";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
@@ -16,7 +23,6 @@ import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
 import Select from "@mui/material/Select";
-import Slider from "@mui/material/Slider";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import TextField from "@mui/material/TextField";
@@ -41,9 +47,12 @@ type QuizFormSettings = {
   answerReveal: AnswerReveal;
   shuffleQuestions: boolean;
   shuffleAnswers: boolean;
-  pageStart: number;
-  pageEnd: number;
+  pageRange: string;
 };
+
+const MIN_QUESTION_COUNT = 5;
+const MAX_QUESTION_COUNT = 50;
+const QUESTION_COUNT_PRESETS = [5, 10, 15, 20, 30] as const;
 
 const defaultSettings: QuizFormSettings = {
   questionCount: 10,
@@ -54,8 +63,7 @@ const defaultSettings: QuizFormSettings = {
   answerReveal: "end",
   shuffleQuestions: true,
   shuffleAnswers: true,
-  pageStart: 1,
-  pageEnd: 1,
+  pageRange: "",
 };
 
 function readFileAsBase64(file: File): Promise<string> {
@@ -96,6 +104,8 @@ export default function QuizSetupForm() {
   const [isReadingPdf, setIsReadingPdf] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [settings, setSettings] = useState(defaultSettings);
+  const [customizePageRange, setCustomizePageRange] = useState(false);
+  const [pageRangeLabel, setPageRangeLabel] = useState("all pages");
 
   const getPdfInfo = trpc.quiz.getPdfInfo.useMutation();
   const generateQuiz = trpc.quiz.generate.useMutation();
@@ -123,10 +133,10 @@ export default function QuizSetupForm() {
       setPdfFile(file);
       setPdfBase64(base64);
       setPageCount(info.pageCount);
+      setCustomizePageRange(false);
       setSettings((prev) => ({
         ...prev,
-        pageStart: 1,
-        pageEnd: info.pageCount,
+        pageRange: "",
       }));
     } catch (err) {
       setPdfFile(null);
@@ -194,15 +204,21 @@ export default function QuizSetupForm() {
       return;
     }
 
-    if (settings.pageStart < 1 || settings.pageEnd > pageCount) {
-      setError(`Page range must be between 1 and ${pageCount}.`);
+    const pageRangeSpec = customizePageRange
+      ? settings.pageRange.trim()
+      : `1-${pageCount}`;
+
+    let selectedPages: number[];
+    try {
+      selectedPages = parsePageRangeSpec(pageRangeSpec, pageCount);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid page range.");
       return;
     }
 
-    if (settings.pageStart > settings.pageEnd) {
-      setError("Start page must be less than or equal to end page.");
-      return;
-    }
+    setPageRangeLabel(
+      customizePageRange ? pageRangeSpec : `all ${pageCount} pages`,
+    );
 
     setError(null);
     setGenerationError(null);
@@ -220,8 +236,9 @@ export default function QuizSetupForm() {
           answerReveal: settings.answerReveal,
           shuffleQuestions: settings.shuffleQuestions,
           shuffleAnswers: settings.shuffleAnswers,
-          pageStart: settings.pageStart,
-          pageEnd: settings.pageEnd,
+          pageRange: pageRangeSpec,
+          pageStart: selectedPages[0],
+          pageEnd: selectedPages[selectedPages.length - 1],
         },
       });
 
@@ -245,8 +262,7 @@ export default function QuizSetupForm() {
   if (isGenerating) {
     return (
       <QuizGenerationProgress
-        pageStart={settings.pageStart}
-        pageEnd={settings.pageEnd}
+        pageRangeLabel={pageRangeLabel}
         questionCount={settings.questionCount}
       />
     );
@@ -264,7 +280,11 @@ export default function QuizSetupForm() {
         >
           {generationError}
         </Typography>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 2 }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          sx={{ mt: 2 }}
+        >
           <Button
             variant="contained"
             onClick={() => {
@@ -390,6 +410,8 @@ export default function QuizSetupForm() {
                         setPdfFile(null);
                         setPdfBase64(null);
                         setPageCount(null);
+                        setCustomizePageRange(false);
+                        setSettings((prev) => ({ ...prev, pageRange: "" }));
                         setError(null);
 
                         if (fileInputRef.current)
@@ -440,87 +462,125 @@ export default function QuizSetupForm() {
 
               <Stack spacing={3}>
                 <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
-                    Page range
-                  </Typography>
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="Start page"
-                      size="small"
-                      disabled={!pageCount || isBusy}
-                      slotProps={{
-                        htmlInput: { min: 1, max: pageCount ?? 1 },
-                      }}
-                      value={settings.pageStart}
-                      onChange={(e) =>
-                        updateSetting(
-                          "pageStart",
-                          Math.max(1, Number(e.target.value) || 1),
-                        )
-                      }
-                    />
-                    <TextField
-                      fullWidth
-                      type="number"
-                      label="End page"
-                      size="small"
-                      disabled={!pageCount || isBusy}
-                      slotProps={{
-                        htmlInput: { min: 1, max: pageCount ?? 1 },
-                      }}
-                      value={settings.pageEnd}
-                      onChange={(e) =>
-                        updateSetting(
-                          "pageEnd",
-                          Math.max(1, Number(e.target.value) || 1),
-                        )
-                      }
-                    />
-                  </Stack>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={customizePageRange}
+                        disabled={!pageCount || isBusy}
+                        onChange={(e) => {
+                          const enabled = e.target.checked;
+                          setCustomizePageRange(enabled);
+
+                          if (enabled && pageCount && !settings.pageRange) {
+                            updateSetting("pageRange", `1-${pageCount}`);
+                          }
+                        }}
+                      />
+                    }
+                    label={
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        Customize page range
+                      </Typography>
+                    }
+                    sx={{ m: 0 }}
+                  />
                   <Typography
                     variant="caption"
                     color="text.secondary"
-                    sx={{ mt: 1, display: "block" }}
+                    sx={{ mt: 0.5, display: "block" }}
                   >
                     {pageCount
-                      ? `Select pages 1-${pageCount} to use as source material.`
+                      ? customizePageRange
+                        ? `Choose specific pages from 1-${pageCount}.`
+                        : `Using all ${pageCount} pages as source material.`
                       : "Upload a PDF to choose which pages to use."}
                   </Typography>
+                  <Collapse
+                    in={customizePageRange}
+                    timeout="auto"
+                    unmountOnExit
+                  >
+                    <Box sx={{ pt: 1.5 }}>
+                      <TextField
+                        fullWidth
+                        label="Pages"
+                        size="small"
+                        disabled={!pageCount || isBusy}
+                        placeholder="1, 2, 5-10"
+                        value={settings.pageRange}
+                        onChange={(e) =>
+                          updateSetting("pageRange", e.target.value)
+                        }
+                        helperText={
+                          pageCount
+                            ? `Comma-separated pages and ranges (1-${pageCount}).`
+                            : undefined
+                        }
+                      />
+                    </Box>
+                  </Collapse>
                 </Paper>
 
-                <Box>
-                  <Stack
-                    direction="row"
-                    sx={{ justifyContent: "space-between", mb: 1 }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Number of questions
-                    </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Box>
                     <Typography
                       variant="body2"
-                      color="primary.main"
-                      sx={{ fontWeight: 600 }}
+                      sx={{ fontWeight: 600, mb: 1.5 }}
                     >
-                      {settings.questionCount}
+                      Number of questions
                     </Typography>
-                  </Stack>
-                  <Slider
-                    value={settings.questionCount}
-                    min={5}
-                    max={50}
-                    step={1}
-                    marks={[
-                      { value: 5, label: "5" },
-                      { value: 50, label: "50" },
-                    ]}
-                    onChange={(_, value) =>
-                      updateSetting("questionCount", value as number)
-                    }
-                    valueLabelDisplay="auto"
-                  />
-                </Box>
+                    <ToggleButtonGroup
+                      exclusive
+                      fullWidth
+                      size="small"
+                      value={
+                        (QUESTION_COUNT_PRESETS as readonly number[]).includes(
+                          settings.questionCount,
+                        )
+                          ? settings.questionCount
+                          : null
+                      }
+                      onChange={(_, value: number | null) => {
+                        if (value !== null)
+                          updateSetting("questionCount", value);
+                      }}
+                      sx={{ mb: 1.5 }}
+                    >
+                      {QUESTION_COUNT_PRESETS.map((count) => (
+                        <ToggleButton key={count} value={count}>
+                          {count}
+                        </ToggleButton>
+                      ))}
+                    </ToggleButtonGroup>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Custom count"
+                      size="small"
+                      disabled={isBusy}
+                      slotProps={{
+                        htmlInput: {
+                          min: MIN_QUESTION_COUNT,
+                          max: MAX_QUESTION_COUNT,
+                        },
+                      }}
+                      value={settings.questionCount}
+                      onChange={(e) =>
+                        updateSetting(
+                          "questionCount",
+                          Math.max(
+                            MIN_QUESTION_COUNT,
+                            Math.min(
+                              MAX_QUESTION_COUNT,
+                              Number(e.target.value) || MIN_QUESTION_COUNT,
+                            ),
+                          ),
+                        )
+                      }
+                      helperText={`Between ${MIN_QUESTION_COUNT} and ${MAX_QUESTION_COUNT} questions.`}
+                    />
+                  </Box>
+                </Paper>
 
                 <Paper
                   variant="outlined"

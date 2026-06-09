@@ -7,14 +7,12 @@ import { useEffect, useState } from "react";
 import { Loading } from "./Loading";
 
 type QuizGenerationProgressProps = {
-  pageStart: number;
-  pageEnd: number;
+  pageRangeLabel: string;
   questionCount: number;
 };
 
 export function QuizGenerationProgress({
-  pageStart,
-  pageEnd,
+  pageRangeLabel,
   questionCount,
 }: QuizGenerationProgressProps) {
   const [message, setMessage] = useState("Sending your document...");
@@ -27,7 +25,7 @@ export function QuizGenerationProgress({
       {
         at: 1800,
         progress: 42,
-        message: `Extracting text from pages ${pageStart}–${pageEnd}...`,
+        message: `Extracting text from ${pageRangeLabel}...`,
       },
       {
         at: 3200,
@@ -63,7 +61,7 @@ export function QuizGenerationProgress({
       timeouts.forEach(clearTimeout);
       clearInterval(creep);
     };
-  }, [pageStart, pageEnd, questionCount]);
+  }, [pageRangeLabel, questionCount]);
 
   return (
     <Box className="flex min-h-[80vh] flex-col items-center justify-center gap-4 px-4">

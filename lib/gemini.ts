@@ -45,7 +45,7 @@ const questionResponseSchema: ResponseSchema = {
 function buildPrompt(
   text: string,
   settings: PersistedQuizSettings,
-  pageRange: { start: number; end: number },
+  pageRangeLabel: string,
 ): string {
   const questionTypeInstruction =
     settings.questionType === "mixed"
@@ -69,7 +69,7 @@ Rules:
 - Keep questions clear and unambiguous.
 - Include a brief explanation for each answer.
 
-Source pages: ${pageRange.start}-${pageRange.end}
+Source pages: ${pageRangeLabel}
 
 SOURCE TEXT:
 """
@@ -163,7 +163,7 @@ async function generateWithModel(
 export async function generateQuizQuestions(
   text: string,
   settings: PersistedQuizSettings,
-  pageRange: { start: number; end: number },
+  pageRangeLabel: string,
 ): Promise<GeneratedQuestion[]> {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -171,7 +171,7 @@ export async function generateQuizQuestions(
     throw new Error("GEMINI_API_KEY is not configured.");
   }
 
-  const prompt = buildPrompt(text, settings, pageRange);
+  const prompt = buildPrompt(text, settings, pageRangeLabel);
   const models = getModelCandidates();
   const errors: string[] = [];
 

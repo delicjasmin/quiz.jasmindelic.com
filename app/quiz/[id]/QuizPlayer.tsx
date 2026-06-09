@@ -1,7 +1,10 @@
 "use client";
 
 import { shuffleArray } from "@/lib/quiz-utils";
-import type { PersistedQuizSettings } from "@/lib/quiz-types";
+import {
+  formatQuizPageRange,
+  type PersistedQuizSettings,
+} from "@/lib/quiz-types";
 import { trpc } from "@/lib/trpc";
 import { CheckCircleOutlined, HighlightOff } from "@mui/icons-material";
 import Box from "@mui/material/Box";
@@ -225,7 +228,7 @@ export function QuizPlayer({ quizId }: { quizId: string }) {
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {quiz.sourceFileName ?? "Uploaded PDF"} · pages{" "}
-              {settings.pageStart}-{settings.pageEnd} · {quiz.questions.length}{" "}
+              {formatQuizPageRange(settings)} · {quiz.questions.length}{" "}
               questions
             </Typography>
           </Box>

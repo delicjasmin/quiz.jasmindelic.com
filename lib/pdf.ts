@@ -15,27 +15,24 @@ export async function getPdfPageCount(buffer: Buffer): Promise<number> {
   }
 }
 
-export async function extractPdfText(
+export async function extractPdfTextFromPages(
   buffer: Buffer,
-  pageRange: PageRange,
+  pages: number[],
 ): Promise<string> {
   const parser = new PDFParse({ data: buffer });
   try {
     const info = await parser.getInfo();
 
-    if (pageRange.start < 1 || pageRange.end > info.total) {
-      throw new Error(
-        `Page range must be between 1 and ${info.total}. Got ${pageRange.start}-${pageRange.end}.`,
-      );
-    }
-
-    if (pageRange.start > pageRange.end) {
-      throw new Error("Start page must be less than or equal to end page.");
+    for (const page of pages) {
+      if (page < 1 || page > info.total) {
+        throw new Error(
+          `Page range must be between 1 and ${info.total}. Got page ${page}.`,
+        );
+      }
     }
 
     const result = await parser.getText({
-      first: pageRange.start,
-      last: pageRange.end,
+      partial: pages,
       pageJoiner: "",
     });
 
@@ -51,4 +48,17 @@ export async function extractPdfText(
   } finally {
     await parser.destroy();
   }
+}
+
+export async function extractPdfText(
+  buffer: Buffer,
+  pageRange: PageRange,
+): Promise<string> {
+  const pages: number[] = [];
+
+  for (let page = pageRange.start; page <= pageRange.end; page++) {
+    pages.push(page);
+  }
+
+  return extractPdfTextFromPages(buffer, pages);
 }

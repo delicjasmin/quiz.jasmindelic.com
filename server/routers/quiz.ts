@@ -1,5 +1,7 @@
 import { generateQuizQuestions } from "@/lib/gemini";
-import { extractPdfText, getPdfPageCount } from "@/lib/pdf";
+import { parsePageRangeSpec } from "@/lib/page-range";
+import { extractPdfTextFromPages, getPdfPageCount } from "@/lib/pdf";
+import { formatQuizPageRange } from "@/lib/quiz-types";
 import {
   editableQuizSettingsSchema,
   persistedQuizSettingsSchema,
@@ -77,35 +79,31 @@ export const quizRouter = router({
       const buffer = decodePdfBase64(input.pdfBase64);
       const pageCount = await getPdfPageCount(buffer);
 
-      if (input.settings.pageStart > pageCount) {
+      const pageRangeSpec =
+        input.settings.pageRange ??
+        `${input.settings.pageStart}-${input.settings.pageEnd}`;
+
+      let selectedPages: number[];
+      try {
+        selectedPages = parsePageRangeSpec(pageRangeSpec, pageCount);
+      } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Start page must be between 1 and ${pageCount}.`,
+          message:
+            error instanceof Error ? error.message : "Invalid page range.",
         });
       }
 
-      if (input.settings.pageEnd > pageCount) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `End page must be between 1 and ${pageCount}.`,
-        });
-      }
-
-      if (input.settings.pageStart > input.settings.pageEnd) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Start page must be less than or equal to end page.",
-        });
-      }
-
-      const pageRange = {
-        start: input.settings.pageStart,
-        end: input.settings.pageEnd,
+      const persistedSettings = {
+        ...input.settings,
+        pageRange: pageRangeSpec,
+        pageStart: selectedPages[0],
+        pageEnd: selectedPages[selectedPages.length - 1],
       };
 
       let extractedText: string;
       try {
-        extractedText = await extractPdfText(buffer, pageRange);
+        extractedText = await extractPdfTextFromPages(buffer, selectedPages);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -120,8 +118,8 @@ export const quizRouter = router({
       try {
         questions = await generateQuizQuestions(
           extractedText,
-          input.settings,
-          pageRange,
+          persistedSettings,
+          formatQuizPageRange(persistedSettings),
         );
       } catch (error) {
         throw new TRPCError({
@@ -137,7 +135,7 @@ export const quizRouter = router({
         data: {
           title: deriveQuizTitle(input.fileName),
           sourceFileName: input.fileName,
-          settings: input.settings,
+          settings: persistedSettings,
           userId: ctx.session.user.id,
           questions: {
             create: questions.map((question, index) => ({
