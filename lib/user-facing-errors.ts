@@ -16,6 +16,8 @@ function looksTechnical(message: string): boolean {
     lower.includes("generativelanguage.googleapis.com") ||
     lower.includes("error fetching from") ||
     lower.includes("gemini_api_key") ||
+    lower.includes("openai_api_key") ||
+    lower.includes("openai.com") ||
     lower.includes("gemini-2") ||
     lower.includes("gemini-1") ||
     lower.includes("gemini-0") ||
@@ -35,7 +37,11 @@ function mapKnownErrors(message: string): string | null {
     return "The AI service is busy right now. Please wait a moment and try again.";
   }
 
-  if (lower.includes("429") || lower.includes("quota") || lower.includes("rate limit")) {
+  if (
+    lower.includes("429") ||
+    lower.includes("quota") ||
+    lower.includes("rate limit")
+  ) {
     return "Too many quiz generation requests were sent. Please wait a minute and try again.";
   }
 
@@ -48,11 +54,17 @@ function mapKnownErrors(message: string): string | null {
     return "The AI service encountered a problem. Please try again in a few moments.";
   }
 
-  if (lower.includes("api_key_invalid") || lower.includes("api key not valid")) {
+  if (
+    lower.includes("api_key_invalid") ||
+    lower.includes("api key not valid")
+  ) {
     return "Quiz generation is not available right now. Please try again later.";
   }
 
-  if (lower.includes("gemini_api_key is not configured")) {
+  if (
+    lower.includes("gemini_api_key is not configured") ||
+    lower.includes("openai_api_key is not configured")
+  ) {
     return "Quiz generation is not available right now. Please try again later.";
   }
 

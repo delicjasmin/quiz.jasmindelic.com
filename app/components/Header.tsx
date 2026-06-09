@@ -113,7 +113,7 @@ export function Header() {
           <Image src="/logo.png" alt="Quiz Generator" width={32} height={32} />
 
           <h1 className="text-lg font-semibold text-nowrap sm:text-xl">
-            Quiz Generator
+            AI Quiz Generator
           </h1>
         </Link>
 

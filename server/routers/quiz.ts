@@ -1,8 +1,10 @@
-import { generateQuizQuestions } from "@/lib/gemini";
+import type { Prisma } from "@/lib/generated/prisma/client";
+import { generateQuizQuestions } from "@/lib/generate-quiz-questions";
 import { parsePageRangeSpec } from "@/lib/page-range";
 import { extractPdfTextFromPages, getPdfPageCount } from "@/lib/pdf";
-import { formatQuizPageRange } from "@/lib/quiz-types";
 import {
+  formatQuizPageRange,
+  type GeneratedQuestion,
   editableQuizSettingsSchema,
   persistedQuizSettingsSchema,
 } from "@/lib/quiz-types";
@@ -37,6 +39,23 @@ function decodePdfBase64(pdfBase64: string): Buffer {
 
 function deriveQuizTitle(fileName: string): string {
   return fileName.replace(/\.pdf$/i, "").trim() || "Untitled Quiz";
+}
+
+function toQuestionCreateInput(
+  question: GeneratedQuestion,
+  order: number,
+): Prisma.QuestionCreateWithoutQuizInput {
+  return {
+    type: question.type,
+    question: question.question,
+    options:
+      question.type === "multiple-choice"
+        ? (question.options ?? [])
+        : ["True", "False"],
+    correctAnswer: question.correctAnswer,
+    explanation: question.explanation ?? undefined,
+    order,
+  };
 }
 
 async function assertQuizOwner(
@@ -138,17 +157,9 @@ export const quizRouter = router({
           settings: persistedSettings,
           userId: ctx.session.user.id,
           questions: {
-            create: questions.map((question, index) => ({
-              type: question.type,
-              question: question.question,
-              options:
-                question.type === "multiple-choice"
-                  ? question.options
-                  : ["True", "False"],
-              correctAnswer: question.correctAnswer,
-              explanation: question.explanation,
-              order: index + 1,
-            })),
+            create: questions.map((question, index) =>
+              toQuestionCreateInput(question, index + 1),
+            ),
           },
         },
         include: {

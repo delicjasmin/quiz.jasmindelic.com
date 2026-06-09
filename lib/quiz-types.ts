@@ -48,9 +48,9 @@ export function pickEditableQuizSettings(
 export const generatedQuestionSchema = z.object({
   type: z.enum(["multiple-choice", "true-false"]),
   question: z.string().min(1),
-  options: z.array(z.string().min(1)).optional(),
+  options: z.array(z.string().min(1)).nullish(),
   correctAnswer: z.union([z.string().min(1), z.boolean()]),
-  explanation: z.string().optional(),
+  explanation: z.string().nullish(),
 });
 
 export const generatedQuestionsSchema = z.object({
