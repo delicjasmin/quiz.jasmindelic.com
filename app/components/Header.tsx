@@ -16,6 +16,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChangeEvent, useState } from "react";
 import { ThemeSwitch } from "../theme";
 
@@ -83,21 +84,22 @@ function HeaderActions({
         onClick={onNavigate}
       >
         My Quizzes
-    </>
       </Button>
-    <Button
-      component={Link}
-      href="/login"
-      size="small"
-      variant="outlined"
-      onClick={onNavigate}
-    >
-      Sign in
-    </Button>
+      <Button
+        component={Link}
+        href="/login"
+        size="small"
+        variant="outlined"
+        onClick={onNavigate}
+      >
+        Sign in
+      </Button>
+    </>
   );
 }
 
 export function Header() {
+  const router = useRouter();
   const { mode, setMode, systemMode } = useColorScheme();
   const { data: session, isPending } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -113,6 +115,8 @@ export function Header() {
 
   const handleSignOut = async () => {
     await signOut();
+    router.replace("/");
+    router.refresh();
   };
 
   const closeMenu = () => setMenuOpen(false);
@@ -164,33 +168,31 @@ export function Header() {
         <Divider />
         <List disablePadding>
           {!isPending && session && (
-            <>
-              <ListItem sx={{ py: 1.5, gap: 1 }}>
-                <ListItemIcon>
-                  <AccountCircle fontSize="large" />
-                </ListItemIcon>
-                <ListItemText
-                  primary={session.user.name}
-                  secondary={session.user.email}
-                  slotProps={{
-                    secondary: {
-                      sx: { overflow: "hidden", textOverflow: "ellipsis" },
-                    },
-                  }}
-                />
-              </ListItem>
+            <ListItem sx={{ py: 1.5, gap: 1 }}>
+              <ListItemIcon>
+                <AccountCircle fontSize="large" />
+              </ListItemIcon>
+              <ListItemText
+                primary={session.user.name}
+                secondary={session.user.email}
+                slotProps={{
+                  secondary: {
+                    sx: { overflow: "hidden", textOverflow: "ellipsis" },
+                  },
+                }}
+              />
+            </ListItem>
           )}
           {!isPending && (
-              <ListItem disablePadding>
-                <ListItemButton
-                  component={Link}
-                  href="/quizzes"
-                  onClick={closeMenu}
-                >
-                  <ListItemText primary="My Quizzes" />
-                </ListItemButton>
-              </ListItem>
-            </>
+            <ListItem disablePadding>
+              <ListItemButton
+                component={Link}
+                href="/quizzes"
+                onClick={closeMenu}
+              >
+                <ListItemText primary="My Quizzes" />
+              </ListItemButton>
+            </ListItem>
           )}
           <ListItem sx={{ py: 1.5 }}>
             <Stack
