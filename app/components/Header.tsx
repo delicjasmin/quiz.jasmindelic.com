@@ -74,6 +74,17 @@ function HeaderActions({
   }
 
   return (
+    <>
+      <Button
+        component={Link}
+        href="/quizzes"
+        size="small"
+        variant="text"
+        onClick={onNavigate}
+      >
+        My Quizzes
+    </>
+      </Button>
     <Button
       component={Link}
       href="/login"
@@ -168,6 +179,8 @@ export function Header() {
                   }}
                 />
               </ListItem>
+          )}
+          {!isPending && (
               <ListItem disablePadding>
                 <ListItemButton
                   component={Link}

@@ -12,9 +12,8 @@ import { useMemo } from "react";
 import { QuizPlayerCore, type PlayQuiz } from "../../QuizPlayerCore";
 
 export function GuestLocalQuizPlayer({ localId }: { localId: string }) {
-  const quiz = useMemo(() => getGuestQuiz(localId), [localId]);
-
   const playQuiz: PlayQuiz | null = useMemo(() => {
+    const quiz = getGuestQuiz(localId);
     if (!quiz) return null;
 
     return {
@@ -26,7 +25,7 @@ export function GuestLocalQuizPlayer({ localId }: { localId: string }) {
       isShared: false,
       questions: quiz.questions,
     };
-  }, [quiz]);
+  }, [localId]);
 
   if (!playQuiz) {
     return (
@@ -51,6 +50,9 @@ export function GuestLocalQuizPlayer({ localId }: { localId: string }) {
 function StackedActions() {
   return (
     <Box sx={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+      <Button component={Link} href="/quizzes" variant="outlined">
+        My Quizzes
+      </Button>
       <Button component={Link} href="/" variant="contained">
         Create a quiz
       </Button>

@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
+import { GuestQuizzesPage } from "./GuestQuizzesPage";
 import { QuizzesPage } from "./QuizzesPage";
 
 export default async function MyQuizzesPage() {
@@ -9,7 +9,7 @@ export default async function MyQuizzesPage() {
   });
 
   if (!session) {
-    redirect("/login");
+    return <GuestQuizzesPage />;
   }
 
   return <QuizzesPage />;

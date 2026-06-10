@@ -252,9 +252,14 @@ export function QuizPlayerCore({ quiz, guestMode = false }: QuizPlayerCoreProps)
               </Button>
             )}
             {guestMode && (
-              <Button component={Link} href="/login" variant="outlined">
-                Sign in to save
-              </Button>
+              <>
+                <Button component={Link} href="/quizzes" variant="outlined">
+                  My Quizzes
+                </Button>
+                <Button component={Link} href="/login" variant="outlined">
+                  Sign in to save
+                </Button>
+              </>
             )}
           </Stack>
         </Stack>
@@ -293,9 +298,14 @@ export function QuizPlayerCore({ quiz, guestMode = false }: QuizPlayerCoreProps)
                 </Button>
               )}
               {guestMode && (
-                <Button component={Link} href="/login" variant="outlined">
-                  Sign in to save
-                </Button>
+                <>
+                  <Button component={Link} href="/quizzes" variant="outlined">
+                    My Quizzes
+                  </Button>
+                  <Button component={Link} href="/login" variant="outlined">
+                    Sign in to save
+                  </Button>
+                </>
               )}
             </Stack>
           </Paper>
