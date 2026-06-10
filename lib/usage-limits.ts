@@ -1,0 +1,7 @@
+export const GUEST_LIFETIME_LIMIT = 3;
+export const GUEST_DAILY_LIMIT = 1;
+export const AUTH_MONTHLY_LIMIT = 30;
+export const AUTH_DAILY_LIMIT = 5;
+export const IP_GUEST_DAILY_LIMIT = 10;
+export const IP_AUTH_DAILY_LIMIT = 20;
+export const PDF_INFO_HOURLY_LIMIT = 10;

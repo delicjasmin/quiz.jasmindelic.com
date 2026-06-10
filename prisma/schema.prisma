@@ -114,3 +114,17 @@ model Question {
   @@index([quizId])
   @@map("question")
 }
+
+model UsageEvent {
+  id        String   @id @default(cuid())
+  action    String
+  userId    String?
+  guestId   String?
+  ipHash    String
+  createdAt DateTime @default(now())
+
+  @@index([userId, action, createdAt])
+  @@index([guestId, action, createdAt])
+  @@index([ipHash, action, createdAt])
+  @@map("usage_event")
+}

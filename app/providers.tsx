@@ -4,6 +4,7 @@ import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "./theme";
+import { GuestQuizMigrator } from "./components/GuestQuizMigrator";
 import { Header } from "./components/Header";
 import { TRPCProvider } from "./trpc-provider";
 
@@ -13,6 +14,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <ThemeProvider theme={theme}>
         <TRPCProvider>
           <CssBaseline />
+          <GuestQuizMigrator />
           <Header />
           {children}
         </TRPCProvider>

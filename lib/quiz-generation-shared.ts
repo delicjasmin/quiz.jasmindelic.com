@@ -30,6 +30,12 @@ Rules:
 - For multiple-choice, correctAnswer must exactly match one of the options.
 - Keep questions clear and unambiguous.
 - Include a brief explanation for each answer.
+- Multiple-choice options must not give away the answer:
+  - Use short, parallel phrasing across all four options (similar length and structure).
+  - Do not add parenthetical hints, definitions, or clarifications to any option.
+  - Do not make the correct option more specific or informative than the distractors.
+  - Put definitions, translations, and extra context in the explanation field only.
+  - All options should look equally plausible to someone who has not read the source text.
 
 Source pages: ${pageRangeLabel}
 

@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { parseGuestId } from "@/lib/guest-id";
+import { extractClientIp, hashIp } from "@/lib/usage-quota";
 import { initTRPC, TRPCError } from "@trpc/server";
 
 /**
@@ -18,8 +20,12 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   const session = await auth.api.getSession({
     headers: opts.headers,
   });
+  const guestId = parseGuestId(opts.headers);
+  const ipHash = hashIp(extractClientIp(opts.headers));
 
   return {
+    guestId,
+    ipHash,
     prisma,
     session,
     ...opts,

@@ -1,8 +1,14 @@
 "use client";
 
 import { useSession } from "@/lib/auth-client";
+import { createGuestLocalId, saveGuestQuiz } from "@/lib/guest-quizzes";
+import {
+  GUEST_MAX_PAGES,
+  GUEST_MAX_QUESTIONS,
+} from "@/lib/generate-quiz-from-pdf";
 import { parsePageRangeSpec } from "@/lib/page-range";
 import { trpc } from "@/lib/trpc";
+import { GUEST_LIFETIME_LIMIT } from "@/lib/usage-limits";
 import { toUserFacingError } from "@/lib/user-facing-errors";
 import {
   Description,
@@ -60,7 +66,7 @@ const defaultSettings: QuizFormSettings = {
   timerMinutes: 15,
   difficulty: "medium",
   questionType: "mixed",
-  answerReveal: "end",
+  answerReveal: "immediate",
   shuffleQuestions: true,
   shuffleAnswers: true,
   pageRange: "",
@@ -107,8 +113,13 @@ export default function QuizSetupForm() {
   const [customizePageRange, setCustomizePageRange] = useState(false);
   const [pageRangeLabel, setPageRangeLabel] = useState("all pages");
 
+  const { data: quota } = trpc.quiz.getQuota.useQuery(undefined, {
+    enabled: !isSessionPending,
+  });
+
   const getPdfInfo = trpc.quiz.getPdfInfo.useMutation();
   const generateQuiz = trpc.quiz.generate.useMutation();
+  const generateGuest = trpc.quiz.generateGuest.useMutation();
 
   const updateSetting = <K extends keyof QuizFormSettings>(
     key: K,
@@ -119,7 +130,13 @@ export default function QuizSetupForm() {
 
   const MAX_SIZE_MB = 10;
   const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
-  const isGenerating = generateQuiz.isPending;
+  const isGuest = !session;
+  const maxQuestionCount = isGuest ? GUEST_MAX_QUESTIONS : MAX_QUESTION_COUNT;
+  const questionCountPresets = isGuest
+    ? QUESTION_COUNT_PRESETS.filter((count) => count <= GUEST_MAX_QUESTIONS)
+    : QUESTION_COUNT_PRESETS;
+
+  const isGenerating = generateQuiz.isPending || generateGuest.isPending;
   const isBusy = isReadingPdf || isGenerating;
 
   const loadPdfMetadata = async (file: File) => {
@@ -199,11 +216,6 @@ export default function QuizSetupForm() {
       return;
     }
 
-    if (!session) {
-      setError("You must be logged in to generate a quiz.");
-      return;
-    }
-
     const pageRangeSpec = customizePageRange
       ? settings.pageRange.trim()
       : `1-${pageCount}`;
@@ -216,6 +228,13 @@ export default function QuizSetupForm() {
       return;
     }
 
+    if (isGuest && selectedPages.length > GUEST_MAX_PAGES) {
+      setError(
+        `Free quizzes are limited to ${GUEST_MAX_PAGES} pages. Sign in with Google to use more pages or choose a smaller page range.`,
+      );
+      return;
+    }
+
     setPageRangeLabel(
       customizePageRange ? pageRangeSpec : `all ${pageCount} pages`,
     );
@@ -223,26 +242,42 @@ export default function QuizSetupForm() {
     setError(null);
     setGenerationError(null);
 
+    const quizSettings = {
+      questionCount: Math.min(settings.questionCount, maxQuestionCount),
+      timerEnabled: settings.timerEnabled,
+      timerMinutes: settings.timerMinutes,
+      difficulty: isGuest ? ("medium" as const) : settings.difficulty,
+      questionType: settings.questionType,
+      answerReveal: settings.answerReveal,
+      shuffleQuestions: settings.shuffleQuestions,
+      shuffleAnswers: settings.shuffleAnswers,
+      pageRange: pageRangeSpec,
+      pageStart: selectedPages[0],
+      pageEnd: selectedPages[selectedPages.length - 1],
+    };
+
     try {
-      const result = await generateQuiz.mutateAsync({
+      if (session) {
+        const result = await generateQuiz.mutateAsync({
+          pdfBase64,
+          fileName: pdfFile.name,
+          settings: quizSettings,
+        });
+
+        router.push(`/quiz/${result.quizId}`);
+        return;
+      }
+
+      const localId = createGuestLocalId();
+      const result = await generateGuest.mutateAsync({
         pdfBase64,
         fileName: pdfFile.name,
-        settings: {
-          questionCount: settings.questionCount,
-          timerEnabled: settings.timerEnabled,
-          timerMinutes: settings.timerMinutes,
-          difficulty: settings.difficulty,
-          questionType: settings.questionType,
-          answerReveal: settings.answerReveal,
-          shuffleQuestions: settings.shuffleQuestions,
-          shuffleAnswers: settings.shuffleAnswers,
-          pageRange: pageRangeSpec,
-          pageStart: selectedPages[0],
-          pageEnd: selectedPages[selectedPages.length - 1],
-        },
+        settings: quizSettings,
+        localId,
       });
 
-      router.push(`/quiz/${result.quizId}`);
+      saveGuestQuiz(result);
+      router.push(`/quiz/local/${result.localId}`);
     } catch (err) {
       setGenerationError(
         toUserFacingError(
@@ -307,7 +342,24 @@ export default function QuizSetupForm() {
       <Container maxWidth="lg" className="py-4 sm:py-5">
         {!isSessionPending && !session && (
           <Alert severity="info" sx={{ mb: 3 }}>
-            <Link href="/login">Log in</Link> to generate and save quizzes.
+            Try up to {GUEST_LIFETIME_LIMIT} free quizzes (max{" "}
+            {GUEST_MAX_QUESTIONS} questions, {GUEST_MAX_PAGES} pages).{" "}
+            <Link href="/login">Sign in with Google</Link> to save permanently
+            and unlock full settings.
+            {quota?.lifetimeRemaining != null && (
+              <>
+                {" "}
+                {quota.lifetimeRemaining} of {GUEST_LIFETIME_LIMIT} free quizzes
+                remaining.
+              </>
+            )}
+          </Alert>
+        )}
+
+        {!isSessionPending && session && quota && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            {quota.monthlyRemaining ?? 0} of 30 quizzes remaining this month ·{" "}
+            {quota.dailyRemaining} remaining today.
           </Alert>
         )}
 
@@ -546,7 +598,7 @@ export default function QuizSetupForm() {
                       }}
                       sx={{ mb: 1.5 }}
                     >
-                      {QUESTION_COUNT_PRESETS.map((count) => (
+                      {questionCountPresets.map((count) => (
                         <ToggleButton key={count} value={count}>
                           {count}
                         </ToggleButton>
@@ -561,7 +613,7 @@ export default function QuizSetupForm() {
                       slotProps={{
                         htmlInput: {
                           min: MIN_QUESTION_COUNT,
-                          max: MAX_QUESTION_COUNT,
+                          max: maxQuestionCount,
                         },
                       }}
                       value={settings.questionCount}
@@ -571,13 +623,13 @@ export default function QuizSetupForm() {
                           Math.max(
                             MIN_QUESTION_COUNT,
                             Math.min(
-                              MAX_QUESTION_COUNT,
+                              maxQuestionCount,
                               Number(e.target.value) || MIN_QUESTION_COUNT,
                             ),
                           ),
                         )
                       }
-                      helperText={`Between ${MIN_QUESTION_COUNT} and ${MAX_QUESTION_COUNT} questions.`}
+                      helperText={`Between ${MIN_QUESTION_COUNT} and ${maxQuestionCount} questions.`}
                     />
                   </Box>
                 </Paper>
@@ -625,6 +677,7 @@ export default function QuizSetupForm() {
                     fullWidth
                     size="small"
                     value={settings.difficulty}
+                    disabled={isGuest || isBusy}
                     onChange={(_, value: Difficulty | null) => {
                       if (value) updateSetting("difficulty", value);
                     }}
@@ -712,7 +765,7 @@ export default function QuizSetupForm() {
           <Button
             variant="contained"
             size="large"
-            disabled={!pdfFile || !session || isBusy}
+            disabled={!pdfFile || isBusy}
             onClick={() => void handleStartQuiz()}
             className="flex w-full flex-col gap-0.5 lg:w-80"
           >
@@ -723,10 +776,10 @@ export default function QuizSetupForm() {
                 Upload a PDF to enable the quiz.
               </Typography>
             )}
-            {pdfFile && !session && (
+            {pdfFile && isGuest && (
               <Typography variant="caption" color="textDisabled">
                 <InfoRounded fontSize="small" className="mr-1" />
-                Log in to generate and save your quiz.
+                Saved locally until you sign in to your account.
               </Typography>
             )}
           </Button>

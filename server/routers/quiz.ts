@@ -1,45 +1,37 @@
-import type { Prisma } from "@/lib/generated/prisma/client";
-import { generateQuizQuestions } from "@/lib/generate-quiz-questions";
-import { parsePageRangeSpec } from "@/lib/page-range";
-import { extractPdfTextFromPages, getPdfPageCount } from "@/lib/pdf";
 import {
-  formatQuizPageRange,
+  decodePdfBase64,
+  generateQuizFromPdf,
+  GUEST_MAX_PAGES,
+  GUEST_MAX_QUESTIONS,
+} from "@/lib/generate-quiz-from-pdf";
+import type { Prisma } from "@/lib/generated/prisma/client";
+import { getPdfPageCount } from "@/lib/pdf";
+import {
   type GeneratedQuestion,
   editableQuizSettingsSchema,
+  generatedQuestionSchema,
   persistedQuizSettingsSchema,
 } from "@/lib/quiz-types";
-import { toUserFacingError } from "@/lib/user-facing-errors";
+import {
+  assertCanGenerate,
+  assertCanGetPdfInfo,
+  getUsageQuota,
+  recordUsageEvent,
+  USAGE_ACTIONS,
+} from "@/lib/usage-quota";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
 
-const MAX_PDF_BYTES = 10 * 1024 * 1024;
-
 const settingsInputSchema = persistedQuizSettingsSchema;
 
-function decodePdfBase64(pdfBase64: string): Buffer {
-  const buffer = Buffer.from(pdfBase64, "base64");
-
-  if (buffer.length === 0) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "The uploaded PDF is empty.",
-    });
-  }
-
-  if (buffer.length > MAX_PDF_BYTES) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message: "The PDF exceeds the 10MB size limit.",
-    });
-  }
-
-  return buffer;
-}
-
-function deriveQuizTitle(fileName: string): string {
-  return fileName.replace(/\.pdf$/i, "").trim() || "Untitled Quiz";
-}
+const guestQuizPayloadSchema = z.object({
+  localId: z.string().min(1),
+  title: z.string().min(1),
+  sourceFileName: z.string().min(1),
+  settings: persistedQuizSettingsSchema,
+  questions: z.array(generatedQuestionSchema).min(1).max(GUEST_MAX_QUESTIONS),
+});
 
 function toQuestionCreateInput(
   question: GeneratedQuestion,
@@ -78,12 +70,80 @@ async function assertQuizOwner(
 }
 
 export const quizRouter = router({
-  getPdfInfo: protectedProcedure
+  getQuota: publicProcedure.query(async ({ ctx }) => {
+    const tier = ctx.session?.user ? "authenticated" : "guest";
+
+    return getUsageQuota({
+      prisma: ctx.prisma,
+      tier,
+      userId: ctx.session?.user?.id,
+      guestId: ctx.guestId,
+    });
+  }),
+
+  getPdfInfo: publicProcedure
     .input(z.object({ pdfBase64: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      await assertCanGetPdfInfo({
+        prisma: ctx.prisma,
+        guestId: ctx.guestId,
+        ipHash: ctx.ipHash,
+      });
+
       const buffer = decodePdfBase64(input.pdfBase64);
       const pageCount = await getPdfPageCount(buffer);
+
+      await recordUsageEvent({
+        prisma: ctx.prisma,
+        action: USAGE_ACTIONS.PDF_INFO,
+        userId: ctx.session?.user?.id,
+        guestId: ctx.guestId,
+        ipHash: ctx.ipHash,
+      });
+
       return { pageCount };
+    }),
+
+  generateGuest: publicProcedure
+    .input(
+      z.object({
+        pdfBase64: z.string().min(1),
+        fileName: z.string().min(1),
+        settings: settingsInputSchema,
+        localId: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await assertCanGenerate({
+        prisma: ctx.prisma,
+        tier: "guest",
+        guestId: ctx.guestId,
+        ipHash: ctx.ipHash,
+      });
+
+      const result = await generateQuizFromPdf({
+        pdfBase64: input.pdfBase64,
+        fileName: input.fileName,
+        settings: input.settings,
+        maxPages: GUEST_MAX_PAGES,
+        maxQuestionCount: GUEST_MAX_QUESTIONS,
+        forceDifficulty: "medium",
+      });
+
+      await recordUsageEvent({
+        prisma: ctx.prisma,
+        action: USAGE_ACTIONS.QUIZ_GENERATE,
+        guestId: ctx.guestId,
+        ipHash: ctx.ipHash,
+      });
+
+      return {
+        localId: input.localId,
+        title: result.title,
+        sourceFileName: result.sourceFileName,
+        settings: result.persistedSettings,
+        questions: result.questions,
+      };
     }),
 
   generate: protectedProcedure
@@ -95,69 +155,28 @@ export const quizRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const buffer = decodePdfBase64(input.pdfBase64);
-      const pageCount = await getPdfPageCount(buffer);
+      await assertCanGenerate({
+        prisma: ctx.prisma,
+        tier: "authenticated",
+        userId: ctx.session.user.id,
+        guestId: ctx.guestId,
+        ipHash: ctx.ipHash,
+      });
 
-      const pageRangeSpec =
-        input.settings.pageRange ??
-        `${input.settings.pageStart}-${input.settings.pageEnd}`;
-
-      let selectedPages: number[];
-      try {
-        selectedPages = parsePageRangeSpec(pageRangeSpec, pageCount);
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            error instanceof Error ? error.message : "Invalid page range.",
-        });
-      }
-
-      const persistedSettings = {
-        ...input.settings,
-        pageRange: pageRangeSpec,
-        pageStart: selectedPages[0],
-        pageEnd: selectedPages[selectedPages.length - 1],
-      };
-
-      let extractedText: string;
-      try {
-        extractedText = await extractPdfTextFromPages(buffer, selectedPages);
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Failed to extract text from the PDF.",
-        });
-      }
-
-      let questions;
-      try {
-        questions = await generateQuizQuestions(
-          extractedText,
-          persistedSettings,
-          formatQuizPageRange(persistedSettings),
-        );
-      } catch (error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: toUserFacingError(
-            error,
-            "Could not generate quiz questions. Please try again.",
-          ),
-        });
-      }
+      const result = await generateQuizFromPdf({
+        pdfBase64: input.pdfBase64,
+        fileName: input.fileName,
+        settings: input.settings,
+      });
 
       const quiz = await ctx.prisma.quiz.create({
         data: {
-          title: deriveQuizTitle(input.fileName),
-          sourceFileName: input.fileName,
-          settings: persistedSettings,
+          title: result.title,
+          sourceFileName: result.sourceFileName,
+          settings: result.persistedSettings,
           userId: ctx.session.user.id,
           questions: {
-            create: questions.map((question, index) =>
+            create: result.questions.map((question, index) =>
               toQuestionCreateInput(question, index + 1),
             ),
           },
@@ -169,11 +188,60 @@ export const quizRouter = router({
         },
       });
 
+      await recordUsageEvent({
+        prisma: ctx.prisma,
+        action: USAGE_ACTIONS.QUIZ_GENERATE,
+        userId: ctx.session.user.id,
+        guestId: ctx.guestId,
+        ipHash: ctx.ipHash,
+      });
+
       return {
         quizId: quiz.id,
         title: quiz.title,
         questionCount: quiz.questions.length,
       };
+    }),
+
+  importGuestQuizzes: protectedProcedure
+    .input(
+      z.object({
+        quizzes: z.array(guestQuizPayloadSchema).max(3),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.quizzes.length === 0) {
+        return { imported: [] as { localId: string; quizId: string }[] };
+      }
+
+      if (input.quizzes.length > 3) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You can import at most 3 guest quizzes.",
+        });
+      }
+
+      const imported: { localId: string; quizId: string }[] = [];
+
+      for (const guestQuiz of input.quizzes) {
+        const quiz = await ctx.prisma.quiz.create({
+          data: {
+            title: guestQuiz.title,
+            sourceFileName: guestQuiz.sourceFileName,
+            settings: guestQuiz.settings,
+            userId: ctx.session.user.id,
+            questions: {
+              create: guestQuiz.questions.map((question, index) =>
+                toQuestionCreateInput(question, index + 1),
+              ),
+            },
+          },
+        });
+
+        imported.push({ localId: guestQuiz.localId, quizId: quiz.id });
+      }
+
+      return { imported };
     }),
 
   listMine: protectedProcedure.query(async ({ ctx }) => {
