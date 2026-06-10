@@ -1,5 +1,6 @@
 "use client";
 
+import { signIn } from "@/lib/auth-client";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -7,52 +8,29 @@ import Container from "@mui/material/Container";
 import Link from "@mui/material/Link";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
-import Tab from "@mui/material/Tab";
-import Tabs from "@mui/material/Tabs";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import NextLink from "next/link";
-import { useRouter } from "next/navigation";
-import { SubmitEvent, useState } from "react";
-import { signIn, signUp } from "@/lib/auth-client";
-
-type AuthMode = "login" | "register";
+import { useState } from "react";
 
 export function Login() {
-  const router = useRouter();
-  const [mode, setMode] = useState<AuthMode>("login");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (event: SubmitEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const handleGoogleSignIn = async () => {
     setError(null);
     setLoading(true);
 
-    const formData = new FormData(event.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
     try {
-      if (mode === "register") {
-        const name = formData.get("name") as string;
-        const res = await signUp.email({ name, email, password });
+      const res = await signIn.social({
+        provider: "google",
+        callbackURL: "/",
+      });
 
-        if (res.error) {
-          setError(res.error.message ?? "Could not create account.");
-          return;
-        }
-      } else {
-        const res = await signIn.email({ email, password });
-
-        if (res.error) {
-          setError(res.error.message ?? "Invalid email or password.");
-          return;
-        }
+      if (res.error) {
+        setError(res.error.message ?? "Could not sign in with Google.");
       }
-
-      router.push("/");
-      router.refresh();
+    } catch {
+      setError("Could not sign in with Google. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -64,78 +42,24 @@ export function Login() {
         <Stack spacing={3}>
           <Box>
             <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
-              {mode === "login" ? "Welcome back" : "Create an account"}
+              Sign in
             </Typography>
             <Typography variant="body2" color="text.secondary" className="mt-1">
-              {mode === "login"
-                ? "Sign in to save and manage your quizzes."
-                : "Register to generate and share quizzes from your PDFs."}
+              Sign in to save quizzes permanently and sync across devices.
             </Typography>
           </Box>
-
-          <Tabs
-            value={mode}
-            onChange={(_, value: AuthMode) => {
-              setMode(value);
-              setError(null);
-            }}
-            variant="fullWidth"
-          >
-            <Tab label="Log in" value="login" />
-            <Tab label="Register" value="register" />
-          </Tabs>
 
           {error && <Alert severity="error">{error}</Alert>}
 
-          <Box component="form" onSubmit={handleSubmit}>
-            <Stack spacing={2.5}>
-              {mode === "register" && (
-                <TextField
-                  name="name"
-                  label="Full name"
-                  required
-                  fullWidth
-                  autoComplete="name"
-                />
-              )}
-
-              <TextField
-                name="email"
-                label="Email"
-                type="email"
-                required
-                fullWidth
-                autoComplete="email"
-              />
-
-              <TextField
-                name="password"
-                label="Password"
-                type="password"
-                required
-                fullWidth
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-                slotProps={{ htmlInput: { minLength: 8 } }}
-                helperText="At least 8 characters"
-              />
-
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={loading}
-                fullWidth
-              >
-                {loading
-                  ? "Please wait…"
-                  : mode === "login"
-                    ? "Log in"
-                    : "Create account"}
-              </Button>
-            </Stack>
-          </Box>
+          <Button
+            variant="contained"
+            size="large"
+            disabled={loading}
+            fullWidth
+            onClick={() => void handleGoogleSignIn()}
+          >
+            {loading ? "Redirecting…" : "Continue with Google"}
+          </Button>
 
           <Typography
             variant="body2"

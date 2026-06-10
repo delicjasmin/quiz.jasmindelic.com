@@ -38,7 +38,7 @@ function HeaderActions({
         aria-hidden
         sx={{ visibility: "hidden" }}
       >
-        Log in
+        Sign in
       </Button>
     );
   }
@@ -81,7 +81,7 @@ function HeaderActions({
       variant="outlined"
       onClick={onNavigate}
     >
-      Log in
+      Sign in
     </Button>
   );
 }
@@ -215,7 +215,7 @@ export function Header() {
               variant="outlined"
               onClick={closeMenu}
             >
-              Log in
+              Sign in
             </Button>
           )}
         </Box>
