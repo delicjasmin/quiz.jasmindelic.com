@@ -1,11 +1,9 @@
+import type { Prisma } from "@/lib/generated/prisma/client";
 import {
   decodePdfBase64,
-  generateQuizFromPdf,
   GUEST_MAX_PAGES,
   GUEST_MAX_QUESTIONS,
-} from "@/lib/generate-quiz-from-pdf";
-import type { Prisma } from "@/lib/generated/prisma/client";
-import { getPdfPageCount } from "@/lib/pdf";
+} from "@/lib/pdf-limits";
 import {
   type GeneratedQuestion,
   editableQuizSettingsSchema,
@@ -87,6 +85,7 @@ export const quizRouter = router({
       });
 
       const buffer = decodePdfBase64(input.pdfBase64);
+      const { getPdfPageCount } = await import("@/lib/pdf");
       const pageCount = await getPdfPageCount(buffer);
 
       await recordUsageEvent({
@@ -117,6 +116,7 @@ export const quizRouter = router({
         ipHash: ctx.ipHash,
       });
 
+      const { generateQuizFromPdf } = await import("@/lib/generate-quiz-from-pdf");
       const result = await generateQuizFromPdf({
         pdfBase64: input.pdfBase64,
         fileName: input.fileName,
@@ -159,6 +159,7 @@ export const quizRouter = router({
         ipHash: ctx.ipHash,
       });
 
+      const { generateQuizFromPdf } = await import("@/lib/generate-quiz-from-pdf");
       const result = await generateQuizFromPdf({
         pdfBase64: input.pdfBase64,
         fileName: input.fileName,

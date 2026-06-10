@@ -5,7 +5,7 @@ import { createGuestLocalId, saveGuestQuiz } from "@/lib/guest-quizzes";
 import {
   GUEST_MAX_PAGES,
   GUEST_MAX_QUESTIONS,
-} from "@/lib/generate-quiz-from-pdf";
+} from "@/lib/pdf-limits";
 import { parsePageRangeSpec } from "@/lib/page-range";
 import { trpc } from "@/lib/trpc";
 import { GUEST_LIFETIME_LIMIT } from "@/lib/usage-limits";

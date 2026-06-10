@@ -1,3 +1,4 @@
+import { CanvasFactory } from "pdf-parse/worker";
 import { PDFParse } from "pdf-parse";
 
 export type PageRange = {
@@ -5,8 +6,12 @@ export type PageRange = {
   end: number;
 };
 
+function createParser(buffer: Buffer) {
+  return new PDFParse({ data: buffer, CanvasFactory });
+}
+
 export async function getPdfPageCount(buffer: Buffer): Promise<number> {
-  const parser = new PDFParse({ data: buffer });
+  const parser = createParser(buffer);
   try {
     const info = await parser.getInfo();
     return info.total;
@@ -19,7 +24,7 @@ export async function extractPdfTextFromPages(
   buffer: Buffer,
   pages: number[],
 ): Promise<string> {
-  const parser = new PDFParse({ data: buffer });
+  const parser = createParser(buffer);
   try {
     const info = await parser.getInfo();
 
