@@ -21,14 +21,16 @@ import { ChangeEvent, useState } from "react";
 import { ThemeSwitch } from "../theme";
 
 function HeaderActions({
+  session,
+  isPending,
   onSignOut,
   onNavigate,
 }: {
+  session: ReturnType<typeof useSession>["data"];
+  isPending: boolean;
   onSignOut: () => void;
   onNavigate?: () => void;
 }) {
-  const { data: session, isPending } = useSession();
-
   if (isPending) {
     return (
       <Button
@@ -142,7 +144,11 @@ export function Header() {
           }}
         >
           <ThemeSwitch checked={isDark} onChange={handleToggle} />
-          <HeaderActions onSignOut={handleSignOut} />
+          <HeaderActions
+            session={session}
+            isPending={isPending}
+            onSignOut={handleSignOut}
+          />
         </Box>
 
         <IconButton

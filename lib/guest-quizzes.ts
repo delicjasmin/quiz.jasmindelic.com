@@ -1,4 +1,9 @@
-import type { GeneratedQuestion, PersistedQuizSettings } from "@/lib/quiz-types";
+import type {
+  GeneratedQuestion,
+  PersistedQuizSettings,
+  PlayQuestion,
+} from "@/lib/quiz-types";
+import { normalizeQuestionOptions } from "@/lib/quiz-utils";
 import { GUEST_LIFETIME_LIMIT } from "@/lib/usage-limits";
 
 const STORAGE_KEY = "quiz-app:guest-quizzes:v1";
@@ -54,22 +59,12 @@ function persistGuestQuizzes(quizzes: GuestQuiz[]): void {
   notifyGuestQuizzesChanged();
 }
 
-export type GuestQuizQuestion = {
-  id: string;
-  type: string;
-  question: string;
-  options: string[] | null;
-  correctAnswer: string | boolean;
-  explanation: string | null;
-  order: number;
-};
-
 export type GuestQuiz = {
   localId: string;
   title: string;
   sourceFileName: string;
   settings: PersistedQuizSettings;
-  questions: GuestQuizQuestion[];
+  questions: PlayQuestion[];
   createdAt: string;
 };
 
@@ -89,15 +84,12 @@ function toPlayQuestion(
   question: GeneratedQuestion,
   order: number,
   localId: string,
-): GuestQuizQuestion {
+): PlayQuestion {
   return {
     id: `${localId}-q${order}`,
     type: question.type,
     question: question.question,
-    options:
-      question.type === "multiple-choice"
-        ? (question.options ?? [])
-        : ["True", "False"],
+    options: normalizeQuestionOptions(question.type, question.options),
     correctAnswer: question.correctAnswer,
     explanation: question.explanation ?? null,
     order,
@@ -119,7 +111,7 @@ export function subscribeGuestQuizzes(onStoreChange: () => void): () => void {
   };
 }
 
-export function getGuestQuizzesSnapshot(): GuestQuiz[] {
+export function getGuestQuizzes(): GuestQuiz[] {
   return readGuestQuizzesFromStorage();
 }
 
@@ -128,7 +120,10 @@ export function getGuestQuizzesServerSnapshot(): GuestQuiz[] {
 }
 
 export function getGuestQuiz(localId: string): GuestQuiz | null {
-  return readGuestQuizzesFromStorage().find((quiz) => quiz.localId === localId) ?? null;
+  return (
+    readGuestQuizzesFromStorage().find((quiz) => quiz.localId === localId) ??
+    null
+  );
 }
 
 export function saveGuestQuiz(payload: GuestQuizGenerateResult): GuestQuiz {
@@ -157,17 +152,15 @@ export function saveGuestQuiz(payload: GuestQuizGenerateResult): GuestQuiz {
 export function removeGuestQuiz(localId: string): void {
   if (!isBrowser()) return;
 
-  const next = readGuestQuizzesFromStorage().filter((quiz) => quiz.localId !== localId);
+  const next = readGuestQuizzesFromStorage().filter(
+    (quiz) => quiz.localId !== localId,
+  );
   persistGuestQuizzes(next);
 }
 
 export function clearGuestQuizzes(): void {
   if (!isBrowser()) return;
   persistGuestQuizzes([]);
-}
-
-export function guestQuizzesForImport(): GuestQuiz[] {
-  return readGuestQuizzesFromStorage();
 }
 
 export function createGuestLocalId(): string {

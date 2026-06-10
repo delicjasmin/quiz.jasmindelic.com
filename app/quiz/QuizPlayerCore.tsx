@@ -4,7 +4,9 @@ import { shuffleArray } from "@/lib/quiz-utils";
 import {
   formatQuizPageRange,
   type PersistedQuizSettings,
+  type PlayQuestion,
 } from "@/lib/quiz-types";
+export type { PlayQuestion } from "@/lib/quiz-types";
 import { CheckCircleOutlined, HighlightOff } from "@mui/icons-material";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -17,16 +19,6 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
-export type PlayQuestion = {
-  id: string;
-  type: string;
-  question: string;
-  options: string[] | null;
-  correctAnswer: string | boolean;
-  explanation: string | null;
-  order: number;
-};
 
 export type PlayQuiz = {
   id: string;
@@ -92,19 +84,53 @@ function prepareQuestions(
   });
 }
 
+function QuizNavActions({
+  isOwner,
+  guestMode,
+}: {
+  isOwner: boolean;
+  guestMode: boolean;
+}) {
+  if (guestMode) {
+    return (
+      <>
+        <Button component={Link} href="/quizzes" variant="outlined">
+          My Quizzes
+        </Button>
+        <Button component={Link} href="/login" variant="outlined">
+          Sign in to save
+        </Button>
+      </>
+    );
+  }
+  if (isOwner) {
+    return (
+      <Button component={Link} href="/quizzes" variant="outlined">
+        My Quizzes
+      </Button>
+    );
+  }
+  return null;
+}
+
 type QuizPlayerCoreProps = {
   quiz: PlayQuiz;
   guestMode?: boolean;
 };
 
-export function QuizPlayerCore({ quiz, guestMode = false }: QuizPlayerCoreProps) {
+export function QuizPlayerCore({
+  quiz,
+  guestMode = false,
+}: QuizPlayerCoreProps) {
   const settings = quiz.settings;
 
   const [phase, setPhase] = useState<PlayPhase>("lobby");
   const [questions, setQuestions] = useState<PlayQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | boolean>>({});
-  const [feedback, setFeedback] = useState<Record<string, QuestionFeedback>>({});
+  const [feedback, setFeedback] = useState<Record<string, QuestionFeedback>>(
+    {},
+  );
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   const currentQuestion = questions[currentIndex];
@@ -219,8 +245,16 @@ export function QuizPlayerCore({ quiz, guestMode = false }: QuizPlayerCoreProps)
               <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                 Quiz settings
               </Typography>
-              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-                <Chip label={`Difficulty: ${settings.difficulty}`} size="small" />
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                sx={{ flexWrap: "wrap" }}
+              >
+                <Chip
+                  label={`Difficulty: ${settings.difficulty}`}
+                  size="small"
+                />
                 <Chip label={`Type: ${settings.questionType}`} size="small" />
                 <Chip
                   label={`Answers: ${settings.answerReveal}`}
@@ -246,21 +280,7 @@ export function QuizPlayerCore({ quiz, guestMode = false }: QuizPlayerCoreProps)
             <Button variant="contained" size="large" onClick={startQuiz}>
               Start Quiz
             </Button>
-            {quiz.isOwner && (
-              <Button component={Link} href="/quizzes" variant="outlined">
-                My Quizzes
-              </Button>
-            )}
-            {guestMode && (
-              <>
-                <Button component={Link} href="/quizzes" variant="outlined">
-                  My Quizzes
-                </Button>
-                <Button component={Link} href="/login" variant="outlined">
-                  Sign in to save
-                </Button>
-              </>
-            )}
+            <QuizNavActions isOwner={quiz.isOwner} guestMode={guestMode} />
           </Stack>
         </Stack>
       </Container>
@@ -278,7 +298,11 @@ export function QuizPlayerCore({ quiz, guestMode = false }: QuizPlayerCoreProps)
             <Typography variant="h4" sx={{ mb: 1 }}>
               Quiz complete
             </Typography>
-            <Typography variant="h5" color="primary.main" sx={{ fontWeight: 700 }}>
+            <Typography
+              variant="h5"
+              color="primary.main"
+              sx={{ fontWeight: 700 }}
+            >
               {score} / {totalQuestions}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -292,21 +316,7 @@ export function QuizPlayerCore({ quiz, guestMode = false }: QuizPlayerCoreProps)
               <Button variant="contained" onClick={startQuiz}>
                 Try again
               </Button>
-              {quiz.isOwner && (
-                <Button component={Link} href="/quizzes" variant="outlined">
-                  My Quizzes
-                </Button>
-              )}
-              {guestMode && (
-                <>
-                  <Button component={Link} href="/quizzes" variant="outlined">
-                    My Quizzes
-                  </Button>
-                  <Button component={Link} href="/login" variant="outlined">
-                    Sign in to save
-                  </Button>
-                </>
-              )}
+              <QuizNavActions isOwner={quiz.isOwner} guestMode={guestMode} />
             </Stack>
           </Paper>
 
@@ -474,7 +484,11 @@ export function QuizPlayerCore({ quiz, guestMode = false }: QuizPlayerCoreProps)
                 </Typography>
               )}
               {currentQuestion.explanation && (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1 }}
+                >
                   {currentQuestion.explanation}
                 </Typography>
               )}

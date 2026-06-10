@@ -1,6 +1,6 @@
 "use client";
 
-import { clearGuestQuizzes, guestQuizzesForImport } from "@/lib/guest-quizzes";
+import { clearGuestQuizzes, getGuestQuizzes } from "@/lib/guest-quizzes";
 import { useSession } from "@/lib/auth-client";
 import { trpc } from "@/lib/trpc";
 import { useRouter } from "next/navigation";
@@ -15,7 +15,7 @@ export function GuestQuizMigrator() {
   useEffect(() => {
     if (!session?.user || hasImported.current) return;
 
-    const pending = guestQuizzesForImport();
+    const pending = getGuestQuizzes();
     if (pending.length === 0) return;
 
     hasImported.current = true;

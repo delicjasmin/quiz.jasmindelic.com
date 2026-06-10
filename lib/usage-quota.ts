@@ -11,13 +11,6 @@ import {
 import { TRPCError } from "@trpc/server";
 import { createHash } from "crypto";
 
-export {
-  AUTH_DAILY_LIMIT,
-  AUTH_MONTHLY_LIMIT,
-  GUEST_DAILY_LIMIT,
-  GUEST_LIFETIME_LIMIT,
-} from "@/lib/usage-limits";
-export { parseGuestId } from "@/lib/guest-id";
 
 export const USAGE_ACTIONS = {
   QUIZ_GENERATE: "quiz_generate",
@@ -45,8 +38,9 @@ function hoursAgo(hours: number): Date {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
 }
 
-function daysAgo(days: number): Date {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+function startOfDay(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 function startOfMonth(): Date {
@@ -80,7 +74,7 @@ export async function assertCanGenerate(params: {
 }): Promise<void> {
   const { prisma, tier, userId, guestId, ipHash } = params;
   const action = USAGE_ACTIONS.QUIZ_GENERATE;
-  const dayAgo = daysAgo(1);
+  const dayStart = startOfDay();
 
   if (tier === "guest") {
     if (!guestId) {
@@ -91,8 +85,8 @@ export async function assertCanGenerate(params: {
 
     const [lifetime, daily, ipDaily] = await Promise.all([
       countEvents(prisma, { action, guestId }),
-      countEvents(prisma, { action, guestId, createdAt: { gte: dayAgo } }),
-      countEvents(prisma, { action, ipHash, createdAt: { gte: dayAgo } }),
+      countEvents(prisma, { action, guestId, createdAt: { gte: dayStart } }),
+      countEvents(prisma, { action, ipHash, createdAt: { gte: dayStart } }),
     ]);
 
     if (lifetime >= GUEST_LIFETIME_LIMIT) {
@@ -127,8 +121,8 @@ export async function assertCanGenerate(params: {
       userId,
       createdAt: { gte: monthStart },
     }),
-    countEvents(prisma, { action, userId, createdAt: { gte: dayAgo } }),
-    countEvents(prisma, { action, ipHash, createdAt: { gte: dayAgo } }),
+    countEvents(prisma, { action, userId, createdAt: { gte: dayStart } }),
+    countEvents(prisma, { action, ipHash, createdAt: { gte: dayStart } }),
   ]);
 
   if (monthly >= AUTH_MONTHLY_LIMIT) {
@@ -216,7 +210,7 @@ export async function getUsageQuota(params: {
 }> {
   const { prisma, tier, userId, guestId } = params;
   const action = USAGE_ACTIONS.QUIZ_GENERATE;
-  const dayAgo = daysAgo(1);
+  const dayStart = startOfDay();
 
   if (tier === "guest") {
     if (!guestId) {
@@ -230,7 +224,7 @@ export async function getUsageQuota(params: {
 
     const [lifetime, daily] = await Promise.all([
       countEvents(prisma, { action, guestId }),
-      countEvents(prisma, { action, guestId, createdAt: { gte: dayAgo } }),
+      countEvents(prisma, { action, guestId, createdAt: { gte: dayStart } }),
     ]);
 
     return {
@@ -257,7 +251,7 @@ export async function getUsageQuota(params: {
       userId,
       createdAt: { gte: monthStart },
     }),
-    countEvents(prisma, { action, userId, createdAt: { gte: dayAgo } }),
+    countEvents(prisma, { action, userId, createdAt: { gte: dayStart } }),
   ]);
 
   return {

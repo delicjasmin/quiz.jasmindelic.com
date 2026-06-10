@@ -1,7 +1,6 @@
 "use client";
 
 import { getGuestQuiz } from "@/lib/guest-quizzes";
-import type { PersistedQuizSettings } from "@/lib/quiz-types";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
@@ -20,8 +19,8 @@ export function GuestLocalQuizPlayer({ localId }: { localId: string }) {
       id: quiz.localId,
       title: quiz.title,
       sourceFileName: quiz.sourceFileName,
-      settings: quiz.settings as PersistedQuizSettings,
-      isOwner: false,
+      settings: quiz.settings,
+      isOwner: true,
       isShared: false,
       questions: quiz.questions,
     };

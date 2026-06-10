@@ -12,6 +12,7 @@ import {
   generatedQuestionSchema,
   persistedQuizSettingsSchema,
 } from "@/lib/quiz-types";
+import { normalizeQuestionOptions } from "@/lib/quiz-utils";
 import {
   assertCanGenerate,
   assertCanGetPdfInfo,
@@ -22,8 +23,6 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
-
-const settingsInputSchema = persistedQuizSettingsSchema;
 
 const guestQuizPayloadSchema = z.object({
   localId: z.string().min(1),
@@ -40,10 +39,7 @@ function toQuestionCreateInput(
   return {
     type: question.type,
     question: question.question,
-    options:
-      question.type === "multiple-choice"
-        ? (question.options ?? [])
-        : ["True", "False"],
+    options: normalizeQuestionOptions(question.type, question.options),
     correctAnswer: question.correctAnswer,
     explanation: question.explanation ?? undefined,
     order,
@@ -109,7 +105,7 @@ export const quizRouter = router({
       z.object({
         pdfBase64: z.string().min(1),
         fileName: z.string().min(1),
-        settings: settingsInputSchema,
+        settings: persistedQuizSettingsSchema,
         localId: z.string().min(1),
       }),
     )
@@ -151,7 +147,7 @@ export const quizRouter = router({
       z.object({
         pdfBase64: z.string().min(1),
         fileName: z.string().min(1),
-        settings: settingsInputSchema,
+        settings: persistedQuizSettingsSchema,
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -214,32 +210,29 @@ export const quizRouter = router({
         return { imported: [] as { localId: string; quizId: string }[] };
       }
 
-      if (input.quizzes.length > 3) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "You can import at most 3 guest quizzes.",
-        });
-      }
-
-      const imported: { localId: string; quizId: string }[] = [];
-
-      for (const guestQuiz of input.quizzes) {
-        const quiz = await ctx.prisma.quiz.create({
-          data: {
-            title: guestQuiz.title,
-            sourceFileName: guestQuiz.sourceFileName,
-            settings: guestQuiz.settings,
-            userId: ctx.session.user.id,
-            questions: {
-              create: guestQuiz.questions.map((question, index) =>
-                toQuestionCreateInput(question, index + 1),
-              ),
+      const createdQuizzes = await ctx.prisma.$transaction(
+        input.quizzes.map((guestQuiz) =>
+          ctx.prisma.quiz.create({
+            data: {
+              title: guestQuiz.title,
+              sourceFileName: guestQuiz.sourceFileName,
+              settings: guestQuiz.settings,
+              userId: ctx.session.user.id,
+              questions: {
+                create: guestQuiz.questions.map((question, index) =>
+                  toQuestionCreateInput(question, index + 1),
+                ),
+              },
             },
-          },
-        });
+            select: { id: true },
+          }),
+        ),
+      );
 
-        imported.push({ localId: guestQuiz.localId, quizId: quiz.id });
-      }
+      const imported = createdQuizzes.map((quiz, index) => ({
+        localId: input.quizzes[index]!.localId,
+        quizId: quiz.id,
+      }));
 
       return { imported };
     }),
@@ -299,12 +292,12 @@ export const quizRouter = router({
         id: quiz.id,
         title: quiz.title,
         sourceFileName: quiz.sourceFileName,
-        settings: quiz.settings,
+        settings: persistedQuizSettingsSchema.parse(quiz.settings),
         isOwner,
         isShared: quiz.isShared,
         questions: quiz.questions.map((question) => ({
           id: question.id,
-          type: question.type,
+          type: question.type as "multiple-choice" | "true-false",
           question: question.question,
           options: question.options as string[] | null,
           correctAnswer: question.correctAnswer as string | boolean,
@@ -317,8 +310,12 @@ export const quizRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await assertQuizOwner(ctx, input.id, ctx.session.user.id);
-      await ctx.prisma.quiz.delete({ where: { id: input.id } });
+      const { count } = await ctx.prisma.quiz.deleteMany({
+        where: { id: input.id, userId: ctx.session.user.id },
+      });
+      if (count === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Quiz not found." });
+      }
       return { success: true };
     }),
 
@@ -353,20 +350,14 @@ export const quizRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      await assertQuizOwner(ctx, input.id, ctx.session.user.id);
-
-      const quiz = await ctx.prisma.quiz.update({
-        where: { id: input.id },
-        data: {
-          isShared: input.isShared,
-          sharedAt: input.isShared ? new Date() : null,
-        },
+      const sharedAt = input.isShared ? new Date() : null;
+      const { count } = await ctx.prisma.quiz.updateMany({
+        where: { id: input.id, userId: ctx.session.user.id },
+        data: { isShared: input.isShared, sharedAt },
       });
-
-      return {
-        id: quiz.id,
-        isShared: quiz.isShared,
-        sharedAt: quiz.sharedAt,
-      };
+      if (count === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Quiz not found." });
+      }
+      return { id: input.id, isShared: input.isShared, sharedAt };
     }),
 });

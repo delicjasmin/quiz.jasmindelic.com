@@ -8,7 +8,7 @@ import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
-import { QuizPlayerCore, type PlayQuiz } from "../QuizPlayerCore";
+import { QuizPlayerCore } from "../QuizPlayerCore";
 
 export function QuizPlayer({ quizId }: { quizId: string }) {
   const { data, isLoading, error } = trpc.quiz.getForPlay.useQuery({ id: quizId });
@@ -40,7 +40,5 @@ export function QuizPlayer({ quizId }: { quizId: string }) {
     );
   }
 
-  const quiz = data as unknown as PlayQuiz;
-
-  return <QuizPlayerCore quiz={quiz} />;
+  return <QuizPlayerCore quiz={data} />;
 }

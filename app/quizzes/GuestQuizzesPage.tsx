@@ -2,7 +2,7 @@
 
 import {
   getGuestQuizzesServerSnapshot,
-  getGuestQuizzesSnapshot,
+  getGuestQuizzes,
   removeGuestQuiz,
   subscribeGuestQuizzes,
 } from "@/lib/guest-quizzes";
@@ -30,7 +30,7 @@ import { useState, useSyncExternalStore } from "react";
 export function GuestQuizzesPage() {
   const quizzes = useSyncExternalStore(
     subscribeGuestQuizzes,
-    getGuestQuizzesSnapshot,
+    getGuestQuizzes,
     getGuestQuizzesServerSnapshot,
   );
   const [deleteTarget, setDeleteTarget] = useState<{

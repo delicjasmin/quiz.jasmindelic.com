@@ -58,3 +58,13 @@ export const generatedQuestionsSchema = z.object({
 });
 
 export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
+
+export type PlayQuestion = {
+  id: string;
+  type: "multiple-choice" | "true-false";
+  question: string;
+  options: string[] | null;
+  correctAnswer: string | boolean;
+  explanation: string | null;
+  order: number;
+};
