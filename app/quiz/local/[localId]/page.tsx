@@ -1,4 +1,11 @@
+import { NOINDEX_ROBOTS } from "@/lib/seo";
+import type { Metadata } from "next";
 import { GuestLocalQuizPlayer } from "./GuestLocalQuizPlayer";
+
+export const metadata: Metadata = {
+  title: "Quiz",
+  robots: NOINDEX_ROBOTS,
+};
 
 type GuestQuizPageProps = {
   params: Promise<{ localId: string }>;
