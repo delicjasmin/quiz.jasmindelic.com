@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@/lib/generated/prisma/client";
+import type { Prisma, PrismaClient } from "@/lib/generated/prisma/client";
 import {
   AUTH_DAILY_LIMIT,
   AUTH_MONTHLY_LIMIT,
@@ -50,15 +50,25 @@ function startOfMonth(): Date {
 
 async function countEvents(
   prisma: PrismaClient,
-  where: {
-    action: UsageAction;
-    userId?: string;
-    guestId?: string;
-    ipHash?: string;
-    createdAt?: { gte: Date };
-  },
+  where: Prisma.UsageEventWhereInput,
 ): Promise<number> {
   return prisma.usageEvent.count({ where });
+}
+
+function quizGenerateUserScope(
+  userId: string,
+  guestId: string | null,
+): Prisma.UsageEventWhereInput {
+  const action = USAGE_ACTIONS.QUIZ_GENERATE;
+
+  if (!guestId) {
+    return { action, userId };
+  }
+
+  return {
+    action,
+    OR: [{ userId }, { guestId, userId: null }],
+  };
 }
 
 function tooManyRequests(message: string): never {
@@ -115,13 +125,13 @@ export async function assertCanGenerate(params: {
   }
 
   const monthStart = startOfMonth();
+  const userScope = quizGenerateUserScope(userId, guestId);
   const [monthly, daily, ipDaily] = await Promise.all([
     countEvents(prisma, {
-      action,
-      userId,
+      ...userScope,
       createdAt: { gte: monthStart },
     }),
-    countEvents(prisma, { action, userId, createdAt: { gte: dayStart } }),
+    countEvents(prisma, { ...userScope, createdAt: { gte: dayStart } }),
     countEvents(prisma, { action, ipHash, createdAt: { gte: dayStart } }),
   ]);
 
@@ -178,6 +188,24 @@ export async function assertCanGetPdfInfo(params: {
       "Too many PDF uploads in a short time. Please wait a bit and try again.",
     );
   }
+}
+
+export async function linkGuestUsageToUser(params: {
+  prisma: PrismaClient;
+  userId: string;
+  guestId: string;
+}): Promise<number> {
+  const result = await params.prisma.usageEvent.updateMany({
+    where: {
+      guestId: params.guestId,
+      userId: null,
+    },
+    data: {
+      userId: params.userId,
+    },
+  });
+
+  return result.count;
 }
 
 export async function recordUsageEvent(params: {
@@ -245,13 +273,13 @@ export async function getUsageQuota(params: {
   }
 
   const monthStart = startOfMonth();
+  const userScope = quizGenerateUserScope(userId, guestId);
   const [monthly, daily] = await Promise.all([
     countEvents(prisma, {
-      action,
-      userId,
+      ...userScope,
       createdAt: { gte: monthStart },
     }),
-    countEvents(prisma, { action, userId, createdAt: { gte: dayStart } }),
+    countEvents(prisma, { ...userScope, createdAt: { gte: dayStart } }),
   ]);
 
   return {

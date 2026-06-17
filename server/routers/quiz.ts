@@ -15,6 +15,7 @@ import {
   assertCanGenerate,
   assertCanGetPdfInfo,
   getUsageQuota,
+  linkGuestUsageToUser,
   recordUsageEvent,
   USAGE_ACTIONS,
 } from "@/lib/usage-quota";
@@ -199,6 +200,20 @@ export const quizRouter = router({
         questionCount: quiz.questions.length,
       };
     }),
+
+  linkGuestUsage: protectedProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.guestId) {
+      return { linked: 0 };
+    }
+
+    const linked = await linkGuestUsageToUser({
+      prisma: ctx.prisma,
+      userId: ctx.session.user.id,
+      guestId: ctx.guestId,
+    });
+
+    return { linked };
+  }),
 
   importGuestQuizzes: protectedProcedure
     .input(
