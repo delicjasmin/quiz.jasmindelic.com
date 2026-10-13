@@ -1,5 +1,24 @@
 import { DEFAULT_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
+import Box from "@mui/material/Box";
+import Container from "@mui/material/Container";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+
+const features = [
+  {
+    title: "PDF to quiz in one step",
+    body: "Upload any PDF and generate questions directly from its content.",
+  },
+  {
+    title: "Flexible question types",
+    body: "Choose multiple choice, true/false, or a mixed set with adjustable difficulty.",
+  },
+  {
+    title: "Free to try instantly",
+    body: "Start without an account. Sign in later to save quizzes and share them with others.",
+  },
+];
 
 export function HomeLanding() {
   const siteUrl = getSiteUrl();
@@ -19,53 +38,79 @@ export function HomeLanding() {
   };
 
   return (
-    <section className="border-b border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:py-14">
+    <Box
+      component="section"
+      sx={{
+        borderBottom: 1,
+        borderColor: "divider",
+        bgcolor: "background.default",
+      }}
+    >
+      <Container maxWidth="lg" sx={{ py: { xs: 5, sm: 7 } }}>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
 
-        <div className="mx-auto max-w-3xl text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
+        <Box sx={{ mx: "auto", maxWidth: 768, textAlign: "center" }}>
+          <Typography
+            variant="h3"
+            component="h1"
+            sx={{
+              fontWeight: 700,
+              letterSpacing: "-0.025em",
+              fontSize: { xs: "1.875rem", sm: "2.25rem" },
+            }}
+          >
             {HOME_TITLE}
-          </h1>
-          <p className="mt-4 text-base leading-7 text-zinc-600 dark:text-zinc-400 sm:text-lg">
+          </Typography>
+          <Typography
+            sx={{
+              mt: 2,
+              color: "text.secondary",
+              fontSize: { xs: "1rem", sm: "1.125rem" },
+              lineHeight: 1.75,
+            }}
+          >
             Turn lecture notes, textbooks, and study guides into interactive
             quizzes in seconds. Upload a PDF, choose your settings, and let AI
             create questions you can practice with right away.
-          </p>
-        </div>
+          </Typography>
+        </Box>
 
-        <ul className="mx-auto mt-10 grid max-w-4xl gap-4 sm:grid-cols-3">
-          <li className="rounded-xl border border-zinc-200 bg-white p-5 text-left dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              PDF to quiz in one step
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-              Upload any PDF and generate questions directly from its content.
-            </p>
-          </li>
-          <li className="rounded-xl border border-zinc-200 bg-white p-5 text-left dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Flexible question types
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-              Choose multiple choice, true/false, or a mixed set with adjustable
-              difficulty.
-            </p>
-          </li>
-          <li className="rounded-xl border border-zinc-200 bg-white p-5 text-left dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Free to try instantly
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-              Start without an account. Sign in later to save quizzes and share
-              them with others.
-            </p>
-          </li>
-        </ul>
-      </div>
-    </section>
+        <Box
+          component="ul"
+          sx={{
+            mx: "auto",
+            mt: 5,
+            display: "grid",
+            maxWidth: 896,
+            gap: 2,
+            p: 0,
+            listStyle: "none",
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+          }}
+        >
+          {features.map((feature) => (
+            <Paper
+              key={feature.title}
+              component="li"
+              variant="outlined"
+              sx={{ p: 2.5, textAlign: "left" }}
+            >
+              <Typography component="h2" sx={{ fontSize: "0.875rem", fontWeight: 600 }}>
+                {feature.title}
+              </Typography>
+              <Typography
+                variant="body2"
+                sx={{ mt: 1, color: "text.secondary", lineHeight: 1.7 }}
+              >
+                {feature.body}
+              </Typography>
+            </Paper>
+          ))}
+        </Box>
+      </Container>
+    </Box>
   );
 }

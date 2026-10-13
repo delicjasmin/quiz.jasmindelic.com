@@ -1,10 +1,6 @@
 import type { Metadata } from "next";
 import { getQuizForSeo } from "@/lib/quiz-seo";
-import {
-  buildOpenGraph,
-  buildTwitter,
-  NOINDEX_ROBOTS,
-} from "@/lib/seo";
+import { buildSocialMetadata, NOINDEX_ROBOTS } from "@/lib/seo";
 import { QuizPlayer } from "./QuizPlayer";
 
 type QuizPageProps = {
@@ -31,8 +27,13 @@ export async function generateMetadata({
   return {
     title: quiz.title,
     description,
-    openGraph: buildOpenGraph(quiz.title, description, `/quiz/${quiz.id}`),
-    twitter: buildTwitter(quiz.title, description),
+    ...buildSocialMetadata({
+      title: quiz.title,
+      description,
+      path: `/quiz/${quiz.id}`,
+      imagePath: `/quiz/${quiz.id}/opengraph-image`,
+      imageAlt: quiz.title,
+    }),
   };
 }
 

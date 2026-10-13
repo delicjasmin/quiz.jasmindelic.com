@@ -84,33 +84,19 @@ function prepareQuestions(
   });
 }
 
-function QuizNavActions({
-  isOwner,
-  guestMode,
-}: {
-  isOwner: boolean;
-  guestMode: boolean;
-}) {
-  if (guestMode) {
-    return (
-      <>
-        <Button component={Link} href="/quizzes" variant="outlined">
-          My Quizzes
-        </Button>
-        <Button component={Link} href="/login" variant="outlined">
-          Sign in to save
-        </Button>
-      </>
-    );
-  }
-  if (isOwner) {
-    return (
+function QuizNavActions({ guestMode }: { guestMode: boolean }) {
+  return (
+    <>
       <Button component={Link} href="/quizzes" variant="outlined">
         My Quizzes
       </Button>
-    );
-  }
-  return null;
+      {guestMode ? (
+        <Button component={Link} href="/login" variant="outlined">
+          Sign in to save
+        </Button>
+      ) : null}
+    </>
+  );
 }
 
 type QuizPlayerCoreProps = {
@@ -280,7 +266,7 @@ export function QuizPlayerCore({
             <Button variant="contained" size="large" onClick={startQuiz}>
               Start Quiz
             </Button>
-            <QuizNavActions isOwner={quiz.isOwner} guestMode={guestMode} />
+            <QuizNavActions guestMode={guestMode} />
           </Stack>
         </Stack>
       </Container>
@@ -316,7 +302,7 @@ export function QuizPlayerCore({
               <Button variant="contained" onClick={startQuiz}>
                 Try again
               </Button>
-              <QuizNavActions isOwner={quiz.isOwner} guestMode={guestMode} />
+              <QuizNavActions guestMode={guestMode} />
             </Stack>
           </Paper>
 

@@ -1,29 +1,36 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import {
-  buildOpenGraph,
-  buildTwitter,
+  buildSocialMetadata,
   DEFAULT_DESCRIPTION,
   SITE_NAME,
 } from "@/lib/seo";
 import { getSiteUrl } from "@/lib/site-url";
 import Providers from "./providers";
 
+const defaultTitle = `${SITE_NAME} — Create Quizzes from PDFs`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
-    default: `${SITE_NAME} — Create Quizzes from PDFs`,
+    default: defaultTitle,
     template: `%s | ${SITE_NAME}`,
   },
   description: DEFAULT_DESCRIPTION,
-  openGraph: buildOpenGraph(
-    `${SITE_NAME} — Create Quizzes from PDFs`,
-    DEFAULT_DESCRIPTION,
-  ),
-  twitter: buildTwitter(
-    `${SITE_NAME} — Create Quizzes from PDFs`,
-    DEFAULT_DESCRIPTION,
-  ),
+  applicationName: SITE_NAME,
+  category: "education",
+  keywords: [
+    "quiz generator",
+    "PDF quiz",
+    "AI quiz maker",
+    "study tool",
+    "multiple choice generator",
+    "true false quiz",
+  ],
+  ...buildSocialMetadata({
+    title: defaultTitle,
+    description: DEFAULT_DESCRIPTION,
+  }),
   robots: {
     index: true,
     follow: true,
