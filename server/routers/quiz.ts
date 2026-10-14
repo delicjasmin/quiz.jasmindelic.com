@@ -1,8 +1,9 @@
 import type { Prisma } from "@/lib/generated/prisma/client";
 import {
-  decodePdfBase64,
   GUEST_MAX_PAGES,
   GUEST_MAX_QUESTIONS,
+  MAX_PDF_BYTES,
+  MAX_SOURCE_TEXT_CHARS,
 } from "@/lib/pdf-limits";
 import {
   type GeneratedQuestion,
@@ -77,17 +78,17 @@ export const quizRouter = router({
   }),
 
   getPdfInfo: publicProcedure
-    .input(z.object({ pdfBase64: z.string().min(1) }))
+    .input(
+      z.object({
+        byteSize: z.number().int().positive().max(MAX_PDF_BYTES),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       await assertCanGetPdfInfo({
         prisma: ctx.prisma,
         guestId: ctx.guestId,
         ipHash: ctx.ipHash,
       });
-
-      const buffer = decodePdfBase64(input.pdfBase64);
-      const { getPdfPageCount } = await import("@/lib/pdf");
-      const pageCount = await getPdfPageCount(buffer);
 
       await recordUsageEvent({
         prisma: ctx.prisma,
@@ -97,13 +98,14 @@ export const quizRouter = router({
         ipHash: ctx.ipHash,
       });
 
-      return { pageCount };
+      return { byteSize: input.byteSize };
     }),
 
   generateGuest: publicProcedure
     .input(
       z.object({
-        pdfBase64: z.string().min(1),
+        sourceText: z.string().min(1).max(MAX_SOURCE_TEXT_CHARS),
+        pageCount: z.number().int().positive().max(10_000),
         fileName: z.string().min(1),
         settings: persistedQuizSettingsSchema,
         localId: z.string().min(1),
@@ -117,9 +119,11 @@ export const quizRouter = router({
         ipHash: ctx.ipHash,
       });
 
-      const { generateQuizFromPdf } = await import("@/lib/generate-quiz-from-pdf");
+      const { generateQuizFromPdf } =
+        await import("@/lib/generate-quiz-from-pdf");
       const result = await generateQuizFromPdf({
-        pdfBase64: input.pdfBase64,
+        sourceText: input.sourceText,
+        pageCount: input.pageCount,
         fileName: input.fileName,
         settings: input.settings,
         maxPages: GUEST_MAX_PAGES,
@@ -146,7 +150,8 @@ export const quizRouter = router({
   generate: protectedProcedure
     .input(
       z.object({
-        pdfBase64: z.string().min(1),
+        sourceText: z.string().min(1).max(MAX_SOURCE_TEXT_CHARS),
+        pageCount: z.number().int().positive().max(10_000),
         fileName: z.string().min(1),
         settings: persistedQuizSettingsSchema,
       }),
@@ -160,9 +165,11 @@ export const quizRouter = router({
         ipHash: ctx.ipHash,
       });
 
-      const { generateQuizFromPdf } = await import("@/lib/generate-quiz-from-pdf");
+      const { generateQuizFromPdf } =
+        await import("@/lib/generate-quiz-from-pdf");
       const result = await generateQuizFromPdf({
-        pdfBase64: input.pdfBase64,
+        sourceText: input.sourceText,
+        pageCount: input.pageCount,
         fileName: input.fileName,
         settings: input.settings,
       });

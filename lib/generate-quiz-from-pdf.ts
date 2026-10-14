@@ -1,7 +1,6 @@
 import { generateQuizQuestions } from "@/lib/generate-quiz-questions";
 import { parsePageRangeSpec } from "@/lib/page-range";
-import { decodePdfBase64, deriveQuizTitle } from "@/lib/pdf-limits";
-import { extractPdfTextFromPages, getPdfPageCount } from "@/lib/pdf";
+import { deriveQuizTitle, sourceTextTooLong } from "@/lib/pdf-limits";
 import {
   formatQuizPageRange,
   type GeneratedQuestion,
@@ -11,10 +10,12 @@ import { toUserFacingError } from "@/lib/user-facing-errors";
 import { TRPCError } from "@trpc/server";
 
 export { GUEST_MAX_PAGES, GUEST_MAX_QUESTIONS } from "@/lib/pdf-limits";
-export { decodePdfBase64, deriveQuizTitle } from "@/lib/pdf-limits";
+export { deriveQuizTitle } from "@/lib/pdf-limits";
+
 
 export type GenerateQuizFromPdfInput = {
-  pdfBase64: string;
+  sourceText: string;
+  pageCount: number;
   fileName: string;
   settings: PersistedQuizSettings;
   maxPages?: number;
@@ -32,8 +33,16 @@ export type GenerateQuizFromPdfResult = {
 export async function generateQuizFromPdf(
   input: GenerateQuizFromPdfInput,
 ): Promise<GenerateQuizFromPdfResult> {
-  const buffer = decodePdfBase64(input.pdfBase64);
-  const pageCount = await getPdfPageCount(buffer);
+  const pageCount = input.pageCount;
+  const sourceText = input.sourceText.trim();
+
+  if (!sourceText) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "No text could be extracted from the selected pages. The PDF may be image-based or scanned.",
+    });
+  }
 
   const pageRangeSpec =
     input.settings.pageRange ??
@@ -56,6 +65,14 @@ export async function generateQuizFromPdf(
     });
   }
 
+  if (sourceTextTooLong(sourceText, selectedPages.length)) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message:
+        "The selected pages are too long to upload. Choose a smaller page range.",
+    });
+  }
+
   const questionCount = input.maxQuestionCount
     ? Math.min(input.settings.questionCount, input.maxQuestionCount)
     : input.settings.questionCount;
@@ -69,23 +86,10 @@ export async function generateQuizFromPdf(
     pageEnd: selectedPages[selectedPages.length - 1],
   };
 
-  let extractedText: string;
-  try {
-    extractedText = await extractPdfTextFromPages(buffer, selectedPages);
-  } catch (error) {
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        error instanceof Error
-          ? error.message
-          : "Failed to extract text from the PDF.",
-    });
-  }
-
   let questions: GeneratedQuestion[];
   try {
     questions = await generateQuizQuestions(
-      extractedText,
+      sourceText,
       persistedSettings,
       formatQuizPageRange(persistedSettings),
     );

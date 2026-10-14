@@ -94,7 +94,30 @@ function mapKnownErrors(message: string): string | null {
     return "The AI returned an invalid question format. Please try again.";
   }
 
+  if (
+    lower.includes("not valid json") ||
+    lower.includes("request entity too large") ||
+    lower.includes("content too large")
+  ) {
+    return "The upload was too large for the server. Choose a smaller page range and try again.";
+  }
+
+  if (isInputTokenLimitMessage(message)) {
+    return "The selected text was too long for the AI. Please try again; a shorter excerpt of the pages will be used.";
+  }
+
   return null;
+}
+
+export function isInputTokenLimitMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+
+  return (
+    lower.includes("input tokens exceed") ||
+    lower.includes("token limit") ||
+    (lower.includes("tokens") && lower.includes("configured limit")) ||
+    lower.includes("shorter excerpt of the pages will be used")
+  );
 }
 
 export function toUserFacingError(

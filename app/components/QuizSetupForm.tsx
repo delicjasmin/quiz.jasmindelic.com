@@ -2,11 +2,14 @@
 
 import { useSession } from "@/lib/auth-client";
 import { createGuestLocalId, saveGuestQuiz } from "@/lib/guest-quizzes";
+import { parsePageRangeSpec } from "@/lib/page-range";
+import { extractPdfText, readPdfPageCount } from "@/lib/pdf-browser";
 import {
   GUEST_MAX_PAGES,
   GUEST_MAX_QUESTIONS,
+  MAX_PDF_BYTES,
+  MAX_PDF_MB,
 } from "@/lib/pdf-limits";
-import { parsePageRangeSpec } from "@/lib/page-range";
 import { trpc } from "@/lib/trpc";
 import { GUEST_LIFETIME_LIMIT } from "@/lib/usage-limits";
 import { toUserFacingError } from "@/lib/user-facing-errors";
@@ -72,31 +75,6 @@ const defaultSettings: QuizFormSettings = {
   pageRange: "",
 };
 
-function readFileAsBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-
-      if (typeof result !== "string") {
-        reject(new Error("Failed to read the PDF file."));
-        return;
-      }
-
-      const base64 = result.split(",")[1];
-
-      if (!base64) {
-        reject(new Error("Failed to encode the PDF file."));
-        return;
-      }
-
-      resolve(base64);
-    };
-    reader.onerror = () => reject(new Error("Failed to read the PDF file."));
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function QuizSetupForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -105,7 +83,6 @@ export default function QuizSetupForm() {
   const [error, setError] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
   const [isReadingPdf, setIsReadingPdf] = useState(false);
   const [dragActive, setDragActive] = useState(false);
@@ -128,8 +105,6 @@ export default function QuizSetupForm() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
-  const MAX_SIZE_MB = 10;
-  const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
   const isGuest = !session;
   const maxQuestionCount = isGuest ? GUEST_MAX_QUESTIONS : MAX_QUESTION_COUNT;
   const questionCountPresets = isGuest
@@ -144,12 +119,11 @@ export default function QuizSetupForm() {
     setError(null);
 
     try {
-      const base64 = await readFileAsBase64(file);
-      const info = await getPdfInfo.mutateAsync({ pdfBase64: base64 });
+      const nextPageCount = await readPdfPageCount(file);
+      await getPdfInfo.mutateAsync({ byteSize: file.size });
 
       setPdfFile(file);
-      setPdfBase64(base64);
-      setPageCount(info.pageCount);
+      setPageCount(nextPageCount);
       setCustomizePageRange(false);
       setSettings((prev) => ({
         ...prev,
@@ -157,7 +131,6 @@ export default function QuizSetupForm() {
       }));
     } catch (err) {
       setPdfFile(null);
-      setPdfBase64(null);
       setPageCount(null);
 
       if (fileInputRef.current) {
@@ -178,7 +151,6 @@ export default function QuizSetupForm() {
     if (file.type !== "application/pdf") {
       setError("Please upload a PDF file.");
       setPdfFile(null);
-      setPdfBase64(null);
       setPageCount(null);
 
       if (fileInputRef.current) {
@@ -188,10 +160,9 @@ export default function QuizSetupForm() {
       return;
     }
 
-    if (file.size > MAX_SIZE_BYTES) {
-      setError(`The file size exceeds the ${MAX_SIZE_MB}MB limit.`);
+    if (file.size > MAX_PDF_BYTES) {
+      setError(`The file size exceeds the ${MAX_PDF_MB}MB limit.`);
       setPdfFile(null);
-      setPdfBase64(null);
       setPageCount(null);
 
       if (fileInputRef.current) {
@@ -211,7 +182,7 @@ export default function QuizSetupForm() {
   };
 
   const handleStartQuiz = async () => {
-    if (!pdfFile || !pdfBase64 || !pageCount) {
+    if (!pdfFile || !pageCount) {
       setError("Upload a PDF before starting the quiz.");
       return;
     }
@@ -241,6 +212,19 @@ export default function QuizSetupForm() {
 
     setError(null);
     setGenerationError(null);
+    setIsReadingPdf(true);
+
+    let sourceText: string;
+    try {
+      sourceText = await extractPdfText(pdfFile, selectedPages);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to read the PDF file.",
+      );
+      return;
+    } finally {
+      setIsReadingPdf(false);
+    }
 
     const quizSettings = {
       questionCount: Math.min(settings.questionCount, maxQuestionCount),
@@ -259,7 +243,8 @@ export default function QuizSetupForm() {
     try {
       if (session) {
         const result = await generateQuiz.mutateAsync({
-          pdfBase64,
+          sourceText,
+          pageCount,
           fileName: pdfFile.name,
           settings: quizSettings,
         });
@@ -270,7 +255,8 @@ export default function QuizSetupForm() {
 
       const localId = createGuestLocalId();
       const result = await generateGuest.mutateAsync({
-        pdfBase64,
+        sourceText,
+        pageCount,
         fileName: pdfFile.name,
         settings: quizSettings,
         localId,
@@ -339,7 +325,7 @@ export default function QuizSetupForm() {
 
   return (
     <Box className="min-h-[90vh]">
-      <Container maxWidth="lg" className="py-4 sm:py-5">
+      <Container maxWidth="lg" className="pt-4 pb-20">
         {!isSessionPending && !session && (
           <Alert severity="info" sx={{ mb: 3 }}>
             Try up to {GUEST_LIFETIME_LIMIT} free quizzes (max{" "}
@@ -460,7 +446,6 @@ export default function QuizSetupForm() {
                       onClick={(e) => {
                         e.stopPropagation();
                         setPdfFile(null);
-                        setPdfBase64(null);
                         setPageCount(null);
                         setCustomizePageRange(false);
                         setSettings((prev) => ({ ...prev, pageRange: "" }));
@@ -761,7 +746,7 @@ export default function QuizSetupForm() {
           </Grid>
         </Grid>
 
-        <Stack spacing={1.5} sx={{ alignItems: "center", mt: 4 }}>
+        <Stack spacing={1.5} sx={{ alignItems: "center", mt: 6 }}>
           <Button
             variant="contained"
             size="large"

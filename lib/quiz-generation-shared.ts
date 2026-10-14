@@ -16,6 +16,14 @@ export function buildQuizPrompt(
         ? "Use only multiple-choice questions with exactly 4 options each."
         : "Use only true-false questions.";
 
+  const trueFalseBalanceInstruction =
+    settings.questionType === "multiple-choice"
+      ? ""
+      : `
+- Do not default to restating source facts as true statements. About half of the true-false items must contradict the source, so the correct answer is "false".
+- Build each false statement by changing one clear fact from the text (a name, number, relation, cause, or order) and leaving the rest accurate, so the error is unambiguous.
+- When the answer is false, the explanation must state what the source actually says.`;
+
   return `You are an expert educator creating quiz questions from study material.
 
 Generate exactly ${settings.questionCount} quiz questions based ONLY on the source text below.
@@ -26,7 +34,7 @@ Rules:
 - Questions must be answerable from the provided text alone.
 - Multiple-choice questions must have exactly 4 distinct options and one correct answer.
 - True-false questions must not include an options array.
-- For true-false, set correctAnswer to "true" or "false" (lowercase).
+- For true-false, set correctAnswer to "true" or "false" (lowercase).${trueFalseBalanceInstruction}
 - For multiple-choice, correctAnswer must exactly match one of the options.
 - Keep questions clear and unambiguous.
 - Include a brief explanation for each answer.
