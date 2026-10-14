@@ -1,19 +1,14 @@
 "use client";
 
-import { QuizSettingsEditor } from "@/app/components/QuizSettingsEditor";
+import { QuizActionBar } from "@/app/components/QuizActionBar";
+import { QuizSettingsDialog } from "@/app/components/QuizSettingsDialog";
 import { formatQuizDate } from "@/lib/quiz-utils";
 import {
   type EditableQuizSettings,
   pickEditableQuizSettings,
 } from "@/lib/quiz-types";
 import { trpc } from "@/lib/trpc";
-import {
-  DeleteOutlined,
-  Link as LinkIcon,
-  PlayArrow,
-  SettingsOutlined,
-  ShareOutlined,
-} from "@mui/icons-material";
+import { ShareOutlined } from "@mui/icons-material";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -25,12 +20,9 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
-import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
-import Switch from "@mui/material/Switch";
-import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useState } from "react";
@@ -83,13 +75,17 @@ export function QuizzesPage() {
     }
   };
 
-  const handleSaveSettings = async () => {
+  const handleSaveSettings = async (value: {
+    title: string;
+    settings: EditableQuizSettings;
+  }) => {
     if (!settingsTarget) return;
 
     try {
       await updateSettings.mutateAsync({
         id: settingsTarget.id,
-        settings: settingsTarget.settings,
+        title: value.title,
+        settings: value.settings,
       });
       setSettingsTarget(null);
       setSnackbar("Quiz settings updated");
@@ -170,9 +166,12 @@ export function QuizzesPage() {
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
                   spacing={2}
-                  sx={{ justifyContent: "space-between" }}
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: { sm: "center" },
+                  }}
                 >
-                  <Box sx={{ flex: 1 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack
                       direction="row"
                       spacing={1}
@@ -200,80 +199,27 @@ export function QuizzesPage() {
                     </Typography>
                   </Box>
 
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    sx={{ alignItems: "center", flexShrink: 0 }}
-                  >
-                    <Tooltip title="Play quiz">
-                      <Button
-                        component={Link}
-                        href={`/quiz/${quiz.id}`}
-                        variant="contained"
-                        size="small"
-                        startIcon={<PlayArrow />}
-                      >
-                        Play
-                      </Button>
-                    </Tooltip>
-
-                    <Tooltip title="Edit settings">
-                      <IconButton
-                        size="small"
-                        onClick={() =>
-                          setSettingsTarget({
-                            id: quiz.id,
-                            title: quiz.title,
-                            settings: pickEditableQuizSettings(quiz.settings),
-                          })
-                        }
-                      >
-                        <SettingsOutlined fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-
-                    <Tooltip title="Copy share link">
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => void handleCopyLink(quiz.id)}
-                          disabled={!quiz.isShared}
-                        >
-                          <LinkIcon fontSize="small" />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-
-                    <Stack
-                      direction="row"
-                      spacing={0.5}
-                      sx={{ alignItems: "center" }}
-                    >
-                      <Typography variant="caption" color="text.secondary">
-                        Share
-                      </Typography>
-                      <Switch
-                        size="small"
-                        checked={quiz.isShared}
-                        disabled={setShared.isPending}
-                        onChange={(e) =>
-                          void handleShareToggle(quiz.id, e.target.checked)
-                        }
-                      />
-                    </Stack>
-
-                    <Tooltip title="Delete quiz">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() =>
-                          setDeleteTarget({ id: quiz.id, title: quiz.title })
-                        }
-                      >
-                        <DeleteOutlined fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
+                  <QuizActionBar
+                    playHref={`/quiz/${quiz.id}`}
+                    deleteLabel="Delete quiz"
+                    onSettings={() =>
+                      setSettingsTarget({
+                        id: quiz.id,
+                        title: quiz.title,
+                        settings: pickEditableQuizSettings(quiz.settings),
+                      })
+                    }
+                    onDelete={() =>
+                      setDeleteTarget({ id: quiz.id, title: quiz.title })
+                    }
+                    share={{
+                      isShared: quiz.isShared,
+                      pending: setShared.isPending,
+                      onToggle: () =>
+                        void handleShareToggle(quiz.id, !quiz.isShared),
+                      onCopyLink: () => void handleCopyLink(quiz.id),
+                    }}
+                  />
                 </Stack>
               </Paper>
             ))}
@@ -281,41 +227,15 @@ export function QuizzesPage() {
         )}
       </Stack>
 
-      <Dialog
+      <QuizSettingsDialog
+        key={settingsTarget?.id ?? "settings-closed"}
         open={settingsTarget !== null}
+        initialTitle={settingsTarget?.title ?? ""}
+        initialSettings={settingsTarget?.settings ?? null}
+        pending={updateSettings.isPending}
         onClose={() => setSettingsTarget(null)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Quiz settings</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 2 }}>
-            Update play settings for &ldquo;{settingsTarget?.title}&rdquo;.
-            Generation settings like difficulty and question count cannot be
-            changed without creating a new quiz.
-          </DialogContentText>
-          {settingsTarget && (
-            <QuizSettingsEditor
-              settings={settingsTarget.settings}
-              onChange={(settings) =>
-                setSettingsTarget((prev) =>
-                  prev ? { ...prev, settings } : null,
-                )
-              }
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSettingsTarget(null)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={() => void handleSaveSettings()}
-            disabled={updateSettings.isPending}
-          >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onSave={(value) => void handleSaveSettings(value)}
+      />
 
       <Dialog
         open={deleteTarget !== null}
@@ -342,6 +262,7 @@ export function QuizzesPage() {
       </Dialog>
 
       <Snackbar
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         open={snackbar !== null}
         autoHideDuration={3000}
         onClose={() => setSnackbar(null)}

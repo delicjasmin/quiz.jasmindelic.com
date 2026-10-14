@@ -1,6 +1,7 @@
 import {
-  generatedQuestionsSchema,
+  generatedQuizSchema,
   type GeneratedQuestion,
+  type GeneratedQuiz,
   type PersistedQuizSettings,
 } from "@/lib/quiz-types";
 
@@ -27,6 +28,7 @@ export function buildQuizPrompt(
   return `You are an expert educator creating quiz questions from study material.
 
 Generate exactly ${settings.questionCount} quiz questions based ONLY on the source text below.
+Also set title to a short, specific quiz name (3–8 words) that describes the subject of the source. Do not use a filename, and do not wrap the title in quotes.
 Difficulty: ${settings.difficulty}.
 ${questionTypeInstruction}
 
@@ -95,7 +97,7 @@ function normalizeGeneratedQuestions(
 export function parseGeneratedQuestions(
   responseText: string,
   expectedCount: number,
-): GeneratedQuestion[] {
+): GeneratedQuiz {
   let parsed: unknown;
   try {
     parsed = JSON.parse(responseText);
@@ -103,7 +105,7 @@ export function parseGeneratedQuestions(
     throw new Error("The AI returned invalid JSON.");
   }
 
-  const validated = generatedQuestionsSchema.safeParse(parsed);
+  const validated = generatedQuizSchema.safeParse(parsed);
 
   if (!validated.success) {
     console.error(
@@ -121,5 +123,8 @@ export function parseGeneratedQuestions(
     );
   }
 
-  return normalizeGeneratedQuestions(validated.data.questions);
+  return {
+    title: validated.data.title,
+    questions: normalizeGeneratedQuestions(validated.data.questions),
+  };
 }

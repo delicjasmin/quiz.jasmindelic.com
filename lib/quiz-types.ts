@@ -4,6 +4,16 @@ export const MIN_QUESTION_COUNT = 5;
 export const MAX_QUESTION_COUNT = 50;
 export const MIN_TIMER_MINUTES = 1;
 export const MAX_TIMER_MINUTES = 120;
+export const MAX_QUIZ_TITLE_LENGTH = 80;
+
+function normalizeQuizTitle(title: string): string {
+  return title.replace(/\s+/g, " ").trim().slice(0, MAX_QUIZ_TITLE_LENGTH);
+}
+
+export const quizTitleSchema = z
+  .string()
+  .transform(normalizeQuizTitle)
+  .refine((title) => title.length > 0, "Enter a quiz name.");
 
 const difficultySchema = z.enum(["easy", "medium", "hard"]);
 const questionTypeSchema = z.enum(["multiple-choice", "true-false", "mixed"]);
@@ -61,11 +71,16 @@ export const generatedQuestionSchema = z.object({
   explanation: z.string().nullish(),
 });
 
-export const generatedQuestionsSchema = z.object({
+export const generatedQuizSchema = z.object({
+  title: quizTitleSchema,
   questions: z.array(generatedQuestionSchema).min(1),
 });
 
 export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
+export type GeneratedQuiz = {
+  title: string;
+  questions: GeneratedQuestion[];
+};
 
 export type PlayQuestion = {
   id: string;

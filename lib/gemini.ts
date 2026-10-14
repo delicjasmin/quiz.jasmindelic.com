@@ -8,7 +8,7 @@ import {
   parseGeneratedQuestions,
 } from "@/lib/quiz-generation-shared";
 import type {
-  GeneratedQuestion,
+  GeneratedQuiz,
   PersistedQuizSettings,
 } from "@/lib/quiz-types";
 import {
@@ -20,6 +20,11 @@ import {
 const questionResponseSchema: ResponseSchema = {
   type: SchemaType.OBJECT,
   properties: {
+    title: {
+      type: SchemaType.STRING,
+      description:
+        "Short quiz name, 3–8 words, describing the subject of the source.",
+    },
     questions: {
       type: SchemaType.ARRAY,
       items: {
@@ -46,7 +51,7 @@ const questionResponseSchema: ResponseSchema = {
       },
     },
   },
-  required: ["questions"],
+  required: ["title", "questions"],
 };
 
 function getModelCandidates(): string[] {
@@ -92,7 +97,7 @@ export async function generateQuizQuestions(
   text: string,
   settings: PersistedQuizSettings,
   pageRangeLabel: string,
-): Promise<GeneratedQuestion[]> {
+): Promise<GeneratedQuiz> {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {

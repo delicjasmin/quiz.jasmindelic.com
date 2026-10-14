@@ -1,7 +1,9 @@
-import type {
-  GeneratedQuestion,
-  PersistedQuizSettings,
-  PlayQuestion,
+import {
+  quizTitleSchema,
+  type EditableQuizSettings,
+  type GeneratedQuestion,
+  type PersistedQuizSettings,
+  type PlayQuestion,
 } from "@/lib/quiz-types";
 import { normalizeQuestionOptions } from "@/lib/quiz-utils";
 import { GUEST_LIFETIME_LIMIT } from "@/lib/usage-limits";
@@ -147,6 +149,27 @@ export function saveGuestQuiz(payload: GuestQuizGenerateResult): GuestQuiz {
   persistGuestQuizzes(next);
 
   return quiz;
+}
+
+export function updateGuestQuiz(
+  localId: string,
+  update: { title: string; settings: EditableQuizSettings },
+): void {
+  if (!isBrowser()) return;
+
+  const parsed = quizTitleSchema.safeParse(update.title);
+  if (!parsed.success) return;
+
+  const next = readGuestQuizzesFromStorage().map((quiz) =>
+    quiz.localId === localId
+      ? {
+          ...quiz,
+          title: parsed.data,
+          settings: { ...quiz.settings, ...update.settings },
+        }
+      : quiz,
+  );
+  persistGuestQuizzes(next);
 }
 
 export function removeGuestQuiz(localId: string): void {

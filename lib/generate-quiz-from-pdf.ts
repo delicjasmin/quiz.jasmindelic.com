@@ -10,7 +10,6 @@ import {
   type GeneratedQuestion,
   type PersistedQuizSettings,
 } from "@/lib/quiz-types";
-import { deriveQuizTitle } from "@/lib/quiz-utils";
 import {
   guestPageLimitMessage,
   toUserFacingError,
@@ -88,9 +87,9 @@ export async function generateQuizFromPdf(
     pageEnd: selectedPages[selectedPages.length - 1],
   };
 
-  let questions: GeneratedQuestion[];
+  let generated: Awaited<ReturnType<typeof generateQuizQuestions>>;
   try {
-    questions = await generateQuizQuestions(
+    generated = await generateQuizQuestions(
       sourceText,
       persistedSettings,
       formatQuizPageRange(persistedSettings),
@@ -106,9 +105,9 @@ export async function generateQuizFromPdf(
   }
 
   return {
-    title: deriveQuizTitle(input.fileName),
+    title: generated.title,
     sourceFileName: input.fileName,
     persistedSettings,
-    questions,
+    questions: generated.questions,
   };
 }

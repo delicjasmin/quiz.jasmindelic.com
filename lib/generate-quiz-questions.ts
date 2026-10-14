@@ -1,10 +1,7 @@
 import { fitSourceText, MAX_SOURCE_CHARS } from "@/lib/fit-source-text";
 import { generateQuizQuestions as generateWithGemini } from "@/lib/gemini";
 import { generateQuizQuestions as generateWithOpenAI } from "@/lib/openai";
-import type {
-  GeneratedQuestion,
-  PersistedQuizSettings,
-} from "@/lib/quiz-types";
+import type { GeneratedQuiz, PersistedQuizSettings } from "@/lib/quiz-types";
 import { isInputTokenLimitMessage } from "@/lib/user-facing-errors";
 
 type LlmProvider = "gemini" | "openai";
@@ -27,7 +24,7 @@ export async function generateQuizQuestions(
   text: string,
   settings: PersistedQuizSettings,
   pageRangeLabel: string,
-): Promise<GeneratedQuestion[]> {
+): Promise<GeneratedQuiz> {
   const provider = getProvider();
   const run = (source: string) =>
     provider === "openai"

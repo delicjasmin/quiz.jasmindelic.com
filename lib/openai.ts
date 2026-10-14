@@ -4,7 +4,7 @@ import {
   parseGeneratedQuestions,
 } from "@/lib/quiz-generation-shared";
 import type {
-  GeneratedQuestion,
+  GeneratedQuiz,
   PersistedQuizSettings,
 } from "@/lib/quiz-types";
 import {
@@ -15,6 +15,7 @@ import {
 const questionResponseJsonSchema = {
   type: "object",
   properties: {
+    title: { type: "string" },
     questions: {
       type: "array",
       items: {
@@ -43,7 +44,7 @@ const questionResponseJsonSchema = {
       },
     },
   },
-  required: ["questions"],
+  required: ["title", "questions"],
   additionalProperties: false,
 } as const;
 
@@ -84,7 +85,7 @@ export async function generateQuizQuestions(
   text: string,
   settings: PersistedQuizSettings,
   pageRangeLabel: string,
-): Promise<GeneratedQuestion[]> {
+): Promise<GeneratedQuiz> {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {

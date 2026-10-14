@@ -17,7 +17,13 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 
 export type PlayQuiz = {
   id: string;
@@ -101,11 +107,13 @@ function QuizNavActions({ guestMode }: { guestMode: boolean }) {
 type QuizPlayerCoreProps = {
   quiz: PlayQuiz;
   guestMode?: boolean;
+  ownerActions?: ReactNode;
 };
 
 export function QuizPlayerCore({
   quiz,
   guestMode = false,
+  ownerActions,
 }: QuizPlayerCoreProps) {
   const settings = quiz.settings;
 
@@ -214,16 +222,26 @@ export function QuizPlayerCore({
             </Alert>
           )}
 
-          <Box>
-            <Typography variant="h4" component="h1" sx={{ mb: 1 }}>
-              {quiz.title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {quiz.sourceFileName ?? "Uploaded PDF"} · pages{" "}
-              {formatQuizPageRange(settings)} · {quiz.questions.length}{" "}
-              questions
-            </Typography>
-          </Box>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{
+              justifyContent: "space-between",
+              alignItems: { sm: "center" },
+            }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="h4" component="h1" sx={{ mb: 1 }}>
+                {quiz.title}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {quiz.sourceFileName ?? "Uploaded PDF"} · pages{" "}
+                {formatQuizPageRange(settings)} · {quiz.questions.length}{" "}
+                questions
+              </Typography>
+            </Box>
+            {ownerActions}
+          </Stack>
 
           <Paper variant="outlined" sx={{ p: 3 }}>
             <Stack spacing={2}>
@@ -303,6 +321,11 @@ export function QuizPlayerCore({
               </Button>
               <QuizNavActions guestMode={guestMode} />
             </Stack>
+            {ownerActions ? (
+              <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                {ownerActions}
+              </Box>
+            ) : null}
           </Paper>
 
           {showReview && (

@@ -6,6 +6,7 @@ import {
   editableQuizSettingsSchema,
   generatedQuestionSchema,
   persistedQuizSettingsSchema,
+  quizTitleSchema,
 } from "@/lib/quiz-types";
 import { normalizeQuestionOptions } from "@/lib/quiz-utils";
 import {
@@ -343,6 +344,7 @@ export const quizRouter = router({
     .input(
       z.object({
         id: z.string(),
+        title: quizTitleSchema,
         settings: editableQuizSettingsSchema,
       }),
     )
@@ -353,11 +355,12 @@ export const quizRouter = router({
 
       const updated = await ctx.prisma.quiz.update({
         where: { id: input.id },
-        data: { settings },
+        data: { title: input.title, settings },
       });
 
       return {
         id: updated.id,
+        title: updated.title,
         settings: persistedQuizSettingsSchema.parse(updated.settings),
       };
     }),

@@ -1,14 +1,20 @@
 "use client";
 
+import { QuizActionBar } from "@/app/components/QuizActionBar";
+import { QuizSettingsDialog } from "@/app/components/QuizSettingsDialog";
 import {
   getGuestQuizzesServerSnapshot,
   getGuestQuizzes,
   removeGuestQuiz,
   subscribeGuestQuizzes,
+  updateGuestQuiz,
 } from "@/lib/guest-quizzes";
 import { formatQuizDate } from "@/lib/quiz-utils";
+import {
+  pickEditableQuizSettings,
+  type EditableQuizSettings,
+} from "@/lib/quiz-types";
 import { GUEST_LIFETIME_LIMIT } from "@/lib/usage-limits";
-import { DeleteOutlined, PlayArrow } from "@mui/icons-material";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -19,10 +25,8 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
-import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
-import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
@@ -37,6 +41,21 @@ export function GuestQuizzesPage() {
     localId: string;
     title: string;
   } | null>(null);
+  const [settingsTarget, setSettingsTarget] = useState<{
+    localId: string;
+    title: string;
+    settings: EditableQuizSettings;
+  } | null>(null);
+
+  const handleSaveSettings = (value: {
+    title: string;
+    settings: EditableQuizSettings;
+  }) => {
+    if (!settingsTarget) return;
+
+    updateGuestQuiz(settingsTarget.localId, value);
+    setSettingsTarget(null);
+  };
 
   const handleDelete = () => {
     if (!deleteTarget) return;
@@ -99,9 +118,12 @@ export function GuestQuizzesPage() {
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
                   spacing={2}
-                  sx={{ justifyContent: "space-between" }}
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: { sm: "center" },
+                  }}
                 >
-                  <Box sx={{ flex: 1 }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Stack
                       direction="row"
                       spacing={1}
@@ -125,44 +147,38 @@ export function GuestQuizzesPage() {
                     </Typography>
                   </Box>
 
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    sx={{ alignItems: "center", flexShrink: 0 }}
-                  >
-                    <Tooltip title="Play quiz">
-                      <Button
-                        component={Link}
-                        href={`/quiz/local/${quiz.localId}`}
-                        variant="contained"
-                        size="small"
-                        startIcon={<PlayArrow />}
-                      >
-                        Play
-                      </Button>
-                    </Tooltip>
-
-                    <Tooltip title="Remove from this browser">
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() =>
-                          setDeleteTarget({
-                            localId: quiz.localId,
-                            title: quiz.title,
-                          })
-                        }
-                      >
-                        <DeleteOutlined fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  </Stack>
+                  <QuizActionBar
+                    playHref={`/quiz/local/${quiz.localId}`}
+                    deleteLabel="Remove from this browser"
+                    onSettings={() =>
+                      setSettingsTarget({
+                        localId: quiz.localId,
+                        title: quiz.title,
+                        settings: pickEditableQuizSettings(quiz.settings),
+                      })
+                    }
+                    onDelete={() =>
+                      setDeleteTarget({
+                        localId: quiz.localId,
+                        title: quiz.title,
+                      })
+                    }
+                  />
                 </Stack>
               </Paper>
             ))}
           </Stack>
         )}
       </Stack>
+
+      <QuizSettingsDialog
+        key={settingsTarget?.localId ?? "settings-closed"}
+        open={settingsTarget !== null}
+        initialTitle={settingsTarget?.title ?? ""}
+        initialSettings={settingsTarget?.settings ?? null}
+        onClose={() => setSettingsTarget(null)}
+        onSave={handleSaveSettings}
+      />
 
       <Dialog
         open={deleteTarget !== null}
