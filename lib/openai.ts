@@ -7,7 +7,10 @@ import type {
   GeneratedQuestion,
   PersistedQuizSettings,
 } from "@/lib/quiz-types";
-import { toUserFacingError } from "@/lib/user-facing-errors";
+import {
+  AI_UNAVAILABLE_MESSAGE,
+  toUserFacingError,
+} from "@/lib/user-facing-errors";
 
 const questionResponseJsonSchema = {
   type: "object",
@@ -46,15 +49,6 @@ const questionResponseJsonSchema = {
 
 function getModelName(): string {
   return process.env.OPENAI_MODEL?.trim() || "gpt-5-mini";
-}
-
-function isQuotaError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes("429") ||
-    message.includes("quota") ||
-    message.includes("rate limit")
-  );
 }
 
 async function generateWithModel(
@@ -126,19 +120,5 @@ export async function generateQuizQuestions(
     }
   }
 
-  if (isQuotaError(lastError)) {
-    throw new Error(
-      toUserFacingError(
-        lastError,
-        "Too many quiz generation requests were sent. Please wait a minute and try again.",
-      ),
-    );
-  }
-
-  throw new Error(
-    toUserFacingError(
-      lastError,
-      "The AI service is temporarily unavailable. Please try again later.",
-    ),
-  );
+  throw new Error(toUserFacingError(lastError, AI_UNAVAILABLE_MESSAGE));
 }

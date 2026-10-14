@@ -1,17 +1,25 @@
 import { z } from "zod";
 
-export const difficultySchema = z.enum(["easy", "medium", "hard"]);
-export const questionTypeSchema = z.enum([
-  "multiple-choice",
-  "true-false",
-  "mixed",
-]);
-export const answerRevealSchema = z.enum(["immediate", "end", "never"]);
+export const MIN_QUESTION_COUNT = 5;
+export const MAX_QUESTION_COUNT = 50;
+export const MIN_TIMER_MINUTES = 1;
+export const MAX_TIMER_MINUTES = 120;
+
+const difficultySchema = z.enum(["easy", "medium", "hard"]);
+const questionTypeSchema = z.enum(["multiple-choice", "true-false", "mixed"]);
+const answerRevealSchema = z.enum(["immediate", "end", "never"]);
+const generatedQuestionTypeSchema = z.enum(["multiple-choice", "true-false"]);
+
+export type GeneratedQuestionType = z.infer<typeof generatedQuestionTypeSchema>;
 
 export const persistedQuizSettingsSchema = z.object({
-  questionCount: z.number().int().min(5).max(50),
+  questionCount: z
+    .number()
+    .int()
+    .min(MIN_QUESTION_COUNT)
+    .max(MAX_QUESTION_COUNT),
   timerEnabled: z.boolean(),
-  timerMinutes: z.number().int().min(1).max(120),
+  timerMinutes: z.number().int().min(MIN_TIMER_MINUTES).max(MAX_TIMER_MINUTES),
   difficulty: difficultySchema,
   questionType: questionTypeSchema,
   answerReveal: answerRevealSchema,
@@ -46,7 +54,7 @@ export function pickEditableQuizSettings(
 }
 
 export const generatedQuestionSchema = z.object({
-  type: z.enum(["multiple-choice", "true-false"]),
+  type: generatedQuestionTypeSchema,
   question: z.string().min(1),
   options: z.array(z.string().min(1)).nullish(),
   correctAnswer: z.union([z.string().min(1), z.boolean()]),
@@ -61,7 +69,7 @@ export type GeneratedQuestion = z.infer<typeof generatedQuestionSchema>;
 
 export type PlayQuestion = {
   id: string;
-  type: "multiple-choice" | "true-false";
+  type: GeneratedQuestionType;
   question: string;
   options: string[] | null;
   correctAnswer: string | boolean;

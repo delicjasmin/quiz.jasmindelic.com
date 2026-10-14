@@ -68,7 +68,7 @@ export type GuestQuiz = {
   createdAt: string;
 };
 
-export type GuestQuizGenerateResult = {
+type GuestQuizGenerateResult = {
   localId: string;
   title: string;
   sourceFileName: string;

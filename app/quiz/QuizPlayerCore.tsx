@@ -6,7 +6,6 @@ import {
   type PersistedQuizSettings,
   type PlayQuestion,
 } from "@/lib/quiz-types";
-export type { PlayQuestion } from "@/lib/quiz-types";
 import { CheckCircleOutlined, HighlightOff } from "@mui/icons-material";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";

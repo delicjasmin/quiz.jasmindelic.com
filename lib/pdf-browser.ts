@@ -1,6 +1,10 @@
 "use client";
 
-import { sourceTextTooLong } from "@/lib/pdf-limits";
+import {
+  NO_EXTRACTABLE_TEXT_MESSAGE,
+  SOURCE_TEXT_TOO_LONG_MESSAGE,
+  sourceTextTooLong,
+} from "@/lib/pdf-limits";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 async function openPdf(file: File): Promise<PDFDocumentProxy> {
@@ -76,15 +80,11 @@ export async function extractPdfText(
   const combined = chunks.join("\n\n").trim();
 
   if (!combined) {
-    throw new Error(
-      "No text could be extracted from the selected pages. The PDF may be image-based or scanned.",
-    );
+    throw new Error(NO_EXTRACTABLE_TEXT_MESSAGE);
   }
 
   if (sourceTextTooLong(combined, pages.length)) {
-    throw new Error(
-      "The selected pages are too long to upload. Choose a smaller page range.",
-    );
+    throw new Error(SOURCE_TEXT_TOO_LONG_MESSAGE);
   }
 
   return combined;

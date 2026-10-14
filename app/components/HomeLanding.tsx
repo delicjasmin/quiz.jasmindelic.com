@@ -1,5 +1,9 @@
-import { DEFAULT_DESCRIPTION, HOME_TITLE, SITE_NAME } from "@/lib/seo";
-import { getSiteUrl } from "@/lib/site-url";
+import {
+  DEFAULT_DESCRIPTION,
+  getSiteUrl,
+  HOME_TITLE,
+  SITE_NAME,
+} from "@/lib/seo";
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";

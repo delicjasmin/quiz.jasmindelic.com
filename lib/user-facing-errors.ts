@@ -1,3 +1,24 @@
+function isQuotaMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("429") ||
+    lower.includes("quota") ||
+    lower.includes("rate limit")
+  );
+}
+
+export const AI_UNAVAILABLE_MESSAGE =
+  "The AI service is temporarily unavailable. Please try again later.";
+
+export function guestPageLimitMessage(maxPages: number): string {
+  return `Free quizzes are limited to ${maxPages} pages. Sign in with Google to use more pages or choose a smaller page range.`;
+}
+
+export function isQuotaError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return isQuotaMessage(message);
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -37,11 +58,7 @@ function mapKnownErrors(message: string): string | null {
     return "The AI service is busy right now. Please wait a moment and try again.";
   }
 
-  if (
-    lower.includes("429") ||
-    lower.includes("quota") ||
-    lower.includes("rate limit")
-  ) {
+  if (isQuotaMessage(message)) {
     return "Too many quiz generation requests were sent. Please wait a minute and try again.";
   }
 
@@ -140,11 +157,4 @@ export function toUserFacingError(
   }
 
   return message;
-}
-
-export function formatGeminiError(error: unknown): string {
-  return toUserFacingError(
-    error,
-    "The AI service is temporarily unavailable. Please try again later.",
-  );
 }

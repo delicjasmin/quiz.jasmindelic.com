@@ -67,32 +67,3 @@ export function parsePageRangeSpec(
 
   return sorted;
 }
-
-export function formatPageRangeSpec(pages: number[]): string {
-  if (pages.length === 0) return "";
-
-  const ranges: string[] = [];
-  let rangeStart = pages[0];
-  let rangeEnd = pages[0];
-
-  for (let index = 1; index < pages.length; index++) {
-    const page = pages[index];
-
-    if (page === rangeEnd + 1) {
-      rangeEnd = page;
-      continue;
-    }
-
-    ranges.push(
-      rangeStart === rangeEnd ? `${rangeStart}` : `${rangeStart}-${rangeEnd}`,
-    );
-    rangeStart = page;
-    rangeEnd = page;
-  }
-
-  ranges.push(
-    rangeStart === rangeEnd ? `${rangeStart}` : `${rangeStart}-${rangeEnd}`,
-  );
-
-  return ranges.join(", ");
-}

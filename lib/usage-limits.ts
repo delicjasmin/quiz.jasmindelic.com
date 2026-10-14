@@ -1,5 +1,7 @@
 export const GUEST_LIFETIME_LIMIT = 3;
 export const GUEST_DAILY_LIMIT = 1;
+export const GUEST_MAX_PAGES = 5;
+export const GUEST_MAX_QUESTIONS = 10;
 export const AUTH_MONTHLY_LIMIT = 30;
 export const AUTH_DAILY_LIMIT = 5;
 export const IP_GUEST_DAILY_LIMIT = 10;

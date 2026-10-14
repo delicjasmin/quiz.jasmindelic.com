@@ -3,9 +3,9 @@ import "./globals.css";
 import {
   buildSocialMetadata,
   DEFAULT_DESCRIPTION,
+  getSiteUrl,
   SITE_NAME,
 } from "@/lib/seo";
-import { getSiteUrl } from "@/lib/site-url";
 import Providers from "./providers";
 
 const defaultTitle = `${SITE_NAME} — Create Quizzes from PDFs`;

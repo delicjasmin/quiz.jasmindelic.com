@@ -53,7 +53,7 @@ ${text}
 """`;
 }
 
-export function normalizeGeneratedQuestions(
+function normalizeGeneratedQuestions(
   raw: GeneratedQuestion[],
 ): GeneratedQuestion[] {
   return raw.map((question) => {

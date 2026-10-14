@@ -4,15 +4,24 @@ import { useSession } from "@/lib/auth-client";
 import { createGuestLocalId, saveGuestQuiz } from "@/lib/guest-quizzes";
 import { parsePageRangeSpec } from "@/lib/page-range";
 import { extractPdfText, readPdfPageCount } from "@/lib/pdf-browser";
+import { MAX_PDF_BYTES, MAX_PDF_MB } from "@/lib/pdf-limits";
 import {
+  MAX_QUESTION_COUNT,
+  MAX_TIMER_MINUTES,
+  MIN_QUESTION_COUNT,
+  MIN_TIMER_MINUTES,
+  type PersistedQuizSettings,
+} from "@/lib/quiz-types";
+import { trpc } from "@/lib/trpc";
+import {
+  GUEST_LIFETIME_LIMIT,
   GUEST_MAX_PAGES,
   GUEST_MAX_QUESTIONS,
-  MAX_PDF_BYTES,
-  MAX_PDF_MB,
-} from "@/lib/pdf-limits";
-import { trpc } from "@/lib/trpc";
-import { GUEST_LIFETIME_LIMIT } from "@/lib/usage-limits";
-import { toUserFacingError } from "@/lib/user-facing-errors";
+} from "@/lib/usage-limits";
+import {
+  guestPageLimitMessage,
+  toUserFacingError,
+} from "@/lib/user-facing-errors";
 import {
   Description,
   ErrorOutlined,
@@ -43,9 +52,9 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { QuizGenerationProgress } from "./QuizGenerationProgress";
 
-type Difficulty = "easy" | "medium" | "hard";
-type QuestionType = "multiple-choice" | "true-false" | "mixed";
-type AnswerReveal = "immediate" | "end" | "never";
+type Difficulty = PersistedQuizSettings["difficulty"];
+type QuestionType = PersistedQuizSettings["questionType"];
+type AnswerReveal = PersistedQuizSettings["answerReveal"];
 
 type QuizFormSettings = {
   questionCount: number;
@@ -59,8 +68,6 @@ type QuizFormSettings = {
   pageRange: string;
 };
 
-const MIN_QUESTION_COUNT = 5;
-const MAX_QUESTION_COUNT = 50;
 const QUESTION_COUNT_PRESETS = [5, 10, 15, 20, 30] as const;
 
 const defaultSettings: QuizFormSettings = {
@@ -200,9 +207,7 @@ export default function QuizSetupForm() {
     }
 
     if (isGuest && selectedPages.length > GUEST_MAX_PAGES) {
-      setError(
-        `Free quizzes are limited to ${GUEST_MAX_PAGES} pages. Sign in with Google to use more pages or choose a smaller page range.`,
-      );
+      setError(guestPageLimitMessage(GUEST_MAX_PAGES));
       return;
     }
 
@@ -641,12 +646,20 @@ export default function QuizSetupForm() {
                       type="number"
                       label="Time limit (minutes)"
                       size="small"
-                      slotProps={{ htmlInput: { min: 1, max: 120 } }}
+                      slotProps={{
+                        htmlInput: {
+                          min: MIN_TIMER_MINUTES,
+                          max: MAX_TIMER_MINUTES,
+                        },
+                      }}
                       value={settings.timerMinutes}
                       onChange={(e) =>
                         updateSetting(
                           "timerMinutes",
-                          Math.max(1, Math.min(120, Number(e.target.value))),
+                          Math.max(
+                            MIN_TIMER_MINUTES,
+                            Math.min(MAX_TIMER_MINUTES, Number(e.target.value)),
+                          ),
                         )
                       }
                     />

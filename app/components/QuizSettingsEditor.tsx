@@ -1,6 +1,10 @@
 "use client";
 
-import type { EditableQuizSettings } from "@/lib/quiz-types";
+import {
+  MAX_TIMER_MINUTES,
+  MIN_TIMER_MINUTES,
+  type EditableQuizSettings,
+} from "@/lib/quiz-types";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import InputLabel from "@mui/material/InputLabel";
@@ -48,12 +52,20 @@ export function QuizSettingsEditor({
               type="number"
               label="Time limit (minutes)"
               size="small"
-              slotProps={{ htmlInput: { min: 1, max: 120 } }}
+              slotProps={{
+                htmlInput: { min: MIN_TIMER_MINUTES, max: MAX_TIMER_MINUTES },
+              }}
               value={settings.timerMinutes}
               onChange={(e) =>
                 updateSetting(
                   "timerMinutes",
-                  Math.max(1, Math.min(120, Number(e.target.value) || 1)),
+                  Math.max(
+                    MIN_TIMER_MINUTES,
+                    Math.min(
+                      MAX_TIMER_MINUTES,
+                      Number(e.target.value) || MIN_TIMER_MINUTES,
+                    ),
+                  ),
                 )
               }
             />

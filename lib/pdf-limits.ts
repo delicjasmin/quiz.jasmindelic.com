@@ -6,10 +6,13 @@ export const MAX_PDF_MB = 10;
  * Vercel's 4.5MB serverless request-body limit after JSON encoding.
  */
 export const MAX_SOURCE_TEXT_CHARS = 3_000_000;
-export const MAX_SOURCE_CHARS_PER_PAGE = 40_000;
+const MAX_SOURCE_CHARS_PER_PAGE = 40_000;
 
-export const GUEST_MAX_PAGES = 5;
-export const GUEST_MAX_QUESTIONS = 10;
+export const NO_EXTRACTABLE_TEXT_MESSAGE =
+  "No text could be extracted from the selected pages. The PDF may be image-based or scanned.";
+
+export const SOURCE_TEXT_TOO_LONG_MESSAGE =
+  "The selected pages are too long to upload. Choose a smaller page range.";
 
 export function sourceTextTooLong(
   text: string,
@@ -19,8 +22,4 @@ export function sourceTextTooLong(
     text.length > MAX_SOURCE_TEXT_CHARS ||
     text.length > selectedPageCount * MAX_SOURCE_CHARS_PER_PAGE
   );
-}
-
-export function deriveQuizTitle(fileName: string): string {
-  return fileName.replace(/\.pdf$/i, "").trim() || "Untitled Quiz";
 }

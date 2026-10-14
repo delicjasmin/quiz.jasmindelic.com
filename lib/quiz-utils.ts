@@ -22,6 +22,10 @@ export function shuffleArray<T>(items: T[]): T[] {
   return shuffled;
 }
 
+export function deriveQuizTitle(fileName: string): string {
+  return fileName.replace(/\.pdf$/i, "").trim() || "Untitled Quiz";
+}
+
 export function formatQuizDate(date: Date | string): string {
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",

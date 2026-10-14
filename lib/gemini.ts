@@ -11,7 +11,11 @@ import type {
   GeneratedQuestion,
   PersistedQuizSettings,
 } from "@/lib/quiz-types";
-import { formatGeminiError } from "@/lib/user-facing-errors";
+import {
+  AI_UNAVAILABLE_MESSAGE,
+  isQuotaError,
+  toUserFacingError,
+} from "@/lib/user-facing-errors";
 
 const questionResponseSchema: ResponseSchema = {
   type: SchemaType.OBJECT,
@@ -60,11 +64,6 @@ function getModelCandidates(): string[] {
   ];
 }
 
-function isQuotaError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes("429") || message.includes("quota");
-}
-
 async function generateWithModel(
   modelName: string,
   prompt: string,
@@ -110,7 +109,7 @@ export async function generateQuizQuestions(
       return parseGeneratedQuestions(responseText, settings.questionCount);
     } catch (error) {
       console.error(`[gemini] ${modelName} failed:`, error);
-      const formatted = formatGeminiError(error);
+      const formatted = toUserFacingError(error, AI_UNAVAILABLE_MESSAGE);
       errors.push(formatted);
 
       if (!isQuotaError(error) || models.length === 1) {
@@ -119,8 +118,5 @@ export async function generateQuizQuestions(
     }
   }
 
-  throw new Error(
-    errors[0] ??
-      "The AI service is temporarily unavailable. Please try again later.",
-  );
+  throw new Error(errors[0] ?? AI_UNAVAILABLE_MESSAGE);
 }

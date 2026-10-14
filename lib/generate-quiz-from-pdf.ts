@@ -1,19 +1,23 @@
 import { generateQuizQuestions } from "@/lib/generate-quiz-questions";
 import { parsePageRangeSpec } from "@/lib/page-range";
-import { deriveQuizTitle, sourceTextTooLong } from "@/lib/pdf-limits";
+import {
+  NO_EXTRACTABLE_TEXT_MESSAGE,
+  SOURCE_TEXT_TOO_LONG_MESSAGE,
+  sourceTextTooLong,
+} from "@/lib/pdf-limits";
 import {
   formatQuizPageRange,
   type GeneratedQuestion,
   type PersistedQuizSettings,
 } from "@/lib/quiz-types";
-import { toUserFacingError } from "@/lib/user-facing-errors";
+import { deriveQuizTitle } from "@/lib/quiz-utils";
+import {
+  guestPageLimitMessage,
+  toUserFacingError,
+} from "@/lib/user-facing-errors";
 import { TRPCError } from "@trpc/server";
 
-export { GUEST_MAX_PAGES, GUEST_MAX_QUESTIONS } from "@/lib/pdf-limits";
-export { deriveQuizTitle } from "@/lib/pdf-limits";
-
-
-export type GenerateQuizFromPdfInput = {
+type GenerateQuizFromPdfInput = {
   sourceText: string;
   pageCount: number;
   fileName: string;
@@ -23,7 +27,7 @@ export type GenerateQuizFromPdfInput = {
   forceDifficulty?: PersistedQuizSettings["difficulty"];
 };
 
-export type GenerateQuizFromPdfResult = {
+type GenerateQuizFromPdfResult = {
   title: string;
   sourceFileName: string;
   persistedSettings: PersistedQuizSettings;
@@ -39,8 +43,7 @@ export async function generateQuizFromPdf(
   if (!sourceText) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message:
-        "No text could be extracted from the selected pages. The PDF may be image-based or scanned.",
+      message: NO_EXTRACTABLE_TEXT_MESSAGE,
     });
   }
 
@@ -61,15 +64,14 @@ export async function generateQuizFromPdf(
   if (input.maxPages !== undefined && selectedPages.length > input.maxPages) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message: `Free quizzes are limited to ${input.maxPages} pages. Sign in with Google to use more pages or choose a smaller page range.`,
+      message: guestPageLimitMessage(input.maxPages),
     });
   }
 
   if (sourceTextTooLong(sourceText, selectedPages.length)) {
     throw new TRPCError({
       code: "BAD_REQUEST",
-      message:
-        "The selected pages are too long to upload. Choose a smaller page range.",
+      message: SOURCE_TEXT_TOO_LONG_MESSAGE,
     });
   }
 

@@ -1,7 +1,7 @@
 const CHARS_PER_TOKEN = 3.5;
 
 /** Stay under the model's 272k input-token limit, leaving room for instructions. */
-export const MAX_SOURCE_TOKENS = 200_000;
+const MAX_SOURCE_TOKENS = 200_000;
 export const MAX_SOURCE_CHARS = Math.floor(MAX_SOURCE_TOKENS * CHARS_PER_TOKEN);
 
 function clipToBreak(text: string, maxChars: number): string {

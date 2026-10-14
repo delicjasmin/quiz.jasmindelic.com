@@ -34,7 +34,7 @@ export function GuestQuizMigrator() {
             sourceFileName: quiz.sourceFileName,
             settings: quiz.settings,
             questions: quiz.questions.map((question) => ({
-              type: question.type as "multiple-choice" | "true-false",
+              type: question.type,
               question: question.question,
               options:
                 question.type === "true-false" ? undefined : question.options,

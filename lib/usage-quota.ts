@@ -11,14 +11,13 @@ import {
 import { TRPCError } from "@trpc/server";
 import { createHash } from "crypto";
 
-
 export const USAGE_ACTIONS = {
   QUIZ_GENERATE: "quiz_generate",
   PDF_INFO: "pdf_info",
 } as const;
 
 export type UsageAction = (typeof USAGE_ACTIONS)[keyof typeof USAGE_ACTIONS];
-export type UsageTier = "guest" | "authenticated";
+type UsageTier = "guest" | "authenticated";
 
 export function hashIp(ip: string): string {
   return createHash("sha256")

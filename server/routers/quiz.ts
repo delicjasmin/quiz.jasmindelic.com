@@ -1,17 +1,18 @@
 import type { Prisma } from "@/lib/generated/prisma/client";
-import {
-  GUEST_MAX_PAGES,
-  GUEST_MAX_QUESTIONS,
-  MAX_PDF_BYTES,
-  MAX_SOURCE_TEXT_CHARS,
-} from "@/lib/pdf-limits";
+import { MAX_PDF_BYTES, MAX_SOURCE_TEXT_CHARS } from "@/lib/pdf-limits";
 import {
   type GeneratedQuestion,
+  type GeneratedQuestionType,
   editableQuizSettingsSchema,
   generatedQuestionSchema,
   persistedQuizSettingsSchema,
 } from "@/lib/quiz-types";
 import { normalizeQuestionOptions } from "@/lib/quiz-utils";
+import {
+  GUEST_LIFETIME_LIMIT,
+  GUEST_MAX_PAGES,
+  GUEST_MAX_QUESTIONS,
+} from "@/lib/usage-limits";
 import {
   assertCanGenerate,
   assertCanGetPdfInfo,
@@ -23,6 +24,13 @@ import {
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../trpc";
+
+const sourceQuizInputSchema = z.object({
+  sourceText: z.string().min(1).max(MAX_SOURCE_TEXT_CHARS),
+  pageCount: z.number().int().positive().max(10_000),
+  fileName: z.string().min(1),
+  settings: persistedQuizSettingsSchema,
+});
 
 const guestQuizPayloadSchema = z.object({
   localId: z.string().min(1),
@@ -103,11 +111,7 @@ export const quizRouter = router({
 
   generateGuest: publicProcedure
     .input(
-      z.object({
-        sourceText: z.string().min(1).max(MAX_SOURCE_TEXT_CHARS),
-        pageCount: z.number().int().positive().max(10_000),
-        fileName: z.string().min(1),
-        settings: persistedQuizSettingsSchema,
+      sourceQuizInputSchema.extend({
         localId: z.string().min(1),
       }),
     )
@@ -148,14 +152,7 @@ export const quizRouter = router({
     }),
 
   generate: protectedProcedure
-    .input(
-      z.object({
-        sourceText: z.string().min(1).max(MAX_SOURCE_TEXT_CHARS),
-        pageCount: z.number().int().positive().max(10_000),
-        fileName: z.string().min(1),
-        settings: persistedQuizSettingsSchema,
-      }),
-    )
+    .input(sourceQuizInputSchema)
     .mutation(async ({ ctx, input }) => {
       await assertCanGenerate({
         prisma: ctx.prisma,
@@ -225,7 +222,7 @@ export const quizRouter = router({
   importGuestQuizzes: protectedProcedure
     .input(
       z.object({
-        quizzes: z.array(guestQuizPayloadSchema).max(3),
+        quizzes: z.array(guestQuizPayloadSchema).max(GUEST_LIFETIME_LIMIT),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -320,7 +317,7 @@ export const quizRouter = router({
         isShared: quiz.isShared,
         questions: quiz.questions.map((question) => ({
           id: question.id,
-          type: question.type as "multiple-choice" | "true-false",
+          type: question.type as GeneratedQuestionType,
           question: question.question,
           options: question.options as string[] | null,
           correctAnswer: question.correctAnswer as string | boolean,

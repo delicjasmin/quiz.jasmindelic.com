@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { listSharedQuizzesForSitemap } from "@/lib/quiz-seo";
-import { getSiteUrl } from "@/lib/site-url";
+import { getSiteUrl } from "@/lib/seo";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl();

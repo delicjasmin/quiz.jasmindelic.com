@@ -12,13 +12,25 @@ export const NOINDEX_ROBOTS: Metadata["robots"] = {
   follow: false,
 };
 
+export function getSiteUrl() {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+
+  return `http://localhost:${process.env.PORT ?? 3000}`;
+}
+
 function twitterHandle() {
   const handle = process.env.NEXT_PUBLIC_TWITTER_HANDLE?.trim();
   if (!handle) return undefined;
   return handle.startsWith("@") ? handle : `@${handle}`;
 }
 
-export function buildOpenGraph(
+function buildOpenGraph(
   title: string,
   description: string,
   path = "/",
@@ -33,7 +45,7 @@ export function buildOpenGraph(
   };
 }
 
-export function buildTwitter(
+function buildTwitter(
   title: string,
   description: string,
 ): NonNullable<Metadata["twitter"]> {
